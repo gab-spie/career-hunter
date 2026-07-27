@@ -1,0 +1,78 @@
+# =====================================================================
+# Job Radar - configuration d'exemple
+# Copiez ce fichier en config.yaml et adaptez-le. Aucun secret ici :
+# les jetons et cles vont dans le dossier secrets/ (voir README).
+# =====================================================================
+
+# Sources complementaires chargees dynamiquement (modules Python dans src/),
+# en plus de l'API officielle. Interface commune : une fonction fetch().
+# Laissez vide pour n'utiliser que l'API officielle.
+sources_extra: []
+
+# Mots-cles du moteur de scoring (/10)
+mots_cles:
+  forts:            # coeur de cible (gros points)
+    - "m&a"
+    - "corporate finance"
+    - "private equity"
+    - "investment banking"
+    - "transaction services"
+    - "leveraged finance"
+  moyens:           # finance proche
+    - "analyste financier"
+    - "financial analyst"
+    - "asset management"
+  exclus_durs:      # ecarte toujours, meme avec un mot fort
+    - "avocat"
+    - "juridique"
+    - "notaire"
+  exclus:           # ecarte si dans le titre et aucun mot fort present
+    - "vente"
+    - "commercial"
+    - "comptable"
+    - "communication"
+
+# Employeurs cibles : bonus de score si l'offre vient de chez eux
+entreprises_cibles:
+  bonus: 3.5
+  noms:
+    - "goldman sachs"
+    - "morgan stanley"
+    - "rothschild"
+    - "lazard"
+    - "bnp paribas"
+    - "ardian"
+    - "eurazeo"
+
+# Profils = onglets et bots distincts
+profils:
+  alternance:
+    onglet: "Alternance"
+    type: "alternance"
+    contrats: ["apprentissage", "professionnalisation"]
+    lieux:
+      - nom: "Paris / Ile-de-France"
+        latitude: 48.8566
+        longitude: 2.3522
+        rayon_km: 30
+    score_min_alerte: 6.0
+    rentree:                 # ne garder qu'une rentree precise
+      annee: 2027
+      mois: [8, 9, 10, 11]
+      strict: true
+
+# Niveau de diplome vise (europeen : 5=Bac+2, 6=Bac+3, 7=Bac+5)
+diplome:
+  cible_europeen: 7
+  bonus_si_cible: 2.0
+  malus_si_trop_bas: 3.0
+
+# Google Sheet (l'ID est dans l'URL du classeur, entre /d/ et /edit)
+google_sheet:
+  spreadsheet_id: "YOUR_GOOGLE_SHEET_ID"
+  credentials_file: "secrets/google_service_account.json"
+  onglet_archive: "Archive"
+
+comportement:
+  delai_sans_reponse_jours: 21
+  max_offres_par_session: 0

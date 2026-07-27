@@ -1,0 +1,25 @@
+# Secrets et identifiants (jamais versionnes)
+secrets/
+.env
+*.json
+!config.example.json
+
+# Config personnelle (utiliser config.example.yaml comme modele)
+config.yaml
+
+# Donnees locales
+*.sqlite3
+*.db
+data/
+logs/
+*.xlsx
+*.csv
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# OS
+.DS_Store

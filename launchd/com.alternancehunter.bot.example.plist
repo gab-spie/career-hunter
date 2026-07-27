@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Exemple : bot Telegram maintenu en vie (repond aux boutons en continu).
+     Copier dans ~/Library/LaunchAgents/ en adaptant les chemins. -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.alternancehunter.bot</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/python3</string>
+    <string>telegram_bot.py</string>
+    <string>alternance</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/YOU/alternance-hunter</string>
+
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>/Users/YOU/alternance-hunter/logs/bot.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/YOU/alternance-hunter/logs/bot.err.log</string>
+</dict>
+</plist>
