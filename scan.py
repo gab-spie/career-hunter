@@ -51,35 +51,45 @@ def scan_profil(profil_nom: str) -> tuple[int, int]:
     nouvelles = 0
     hors_date = 0
     hors_contrat = 0
+    ignorees = 0
     for o in offres:
-        # filtre type de contrat STRICT (alternance-only ou stage-only)
-        if not contrat.type_ok(o, profil_nom):
-            hors_contrat += 1
-            continue
-        # filtre rentree visee (ex septembre 2027)
-        if rentree and not datematch.passe(o, rentree):
-            hors_date += 1
-            continue
-        r = scoring.score_offer(o["titre"], o["description"], o.get("diplome_eu"),
-                                cfg, entreprise=o.get("entreprise") or "")
-        if r["exclue"] or r["score"] < seuil:
-            continue
-        rec = {
-            "url": o["url"],
-            "source": o["source"],
-            "external_id": o.get("external_id"),
-            "profil": profil_nom,
-            "entreprise": o.get("entreprise"),
-            "titre": o["titre"],
-            "contrat": o.get("contrat"),
-            "lieu": o.get("lieu"),
-            "score": r["score"],
-            "date_debut": (o.get("date_debut") or "")[:10] or None,
-        }
-        if db.add_offer(conn, rec):
-            nouvelles += 1
+        # une offre malformee (cle manquante, source future) ne casse pas le scan
+        try:
+            if not o.get("url") or not o.get("titre"):
+                ignorees += 1
+                continue
+            # filtre type de contrat STRICT (alternance-only ou stage-only)
+            if not contrat.type_ok(o, profil_nom):
+                hors_contrat += 1
+                continue
+            # filtre rentree visee (ex septembre 2027)
+            if rentree and not datematch.passe(o, rentree):
+                hors_date += 1
+                continue
+            r = scoring.score_offer(o.get("titre") or "", o.get("description") or "",
+                                    o.get("diplome_eu"), cfg,
+                                    entreprise=o.get("entreprise") or "")
+            if r["exclue"] or r["score"] < seuil:
+                continue
+            rec = {
+                "url": o["url"],
+                "source": o.get("source") or "inconnue",
+                "external_id": o.get("external_id"),
+                "profil": profil_nom,
+                "entreprise": o.get("entreprise"),
+                "titre": o["titre"],
+                "contrat": o.get("contrat"),
+                "lieu": o.get("lieu"),
+                "score": r["score"],
+                "date_debut": (o.get("date_debut") or "")[:10] or None,
+            }
+            if db.add_offer(conn, rec):
+                nouvelles += 1
+        except Exception as e:  # noqa: BLE001
+            ignorees += 1
+            print("  offre ignoree (erreur):", e)
     print(f"  ({len(offres)} brutes, {hors_contrat} mauvais contrat, "
-          f"{hors_date} hors rentree cible)")
+          f"{hors_date} hors rentree cible, {ignorees} ignorees)")
     return nouvelles, db.count_pending(conn, profil_nom)
 
 

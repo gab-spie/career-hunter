@@ -1,6 +1,6 @@
-# Alternance Hunter
+# Career Hunter
 
-**Radar d'offres finance automatisé.** Il agrège les offres, les note selon un profil personnalisé, et livre les meilleures directement sur Telegram, une par une, avec un suivi qui se met à jour tout seul dans Google Sheets.
+**Radar d'offres finance automatisé (alternance et stage).** Il agrège les offres, les note selon un profil personnalisé, et livre les meilleures directement sur Telegram, une par une, avec un suivi qui se met à jour tout seul dans Google Sheets.
 
 Projet personnel né d'un constat simple : dans une recherche d'alternance ou de stage en finance, la concurrence est rude et les bonnes offres partent vite. Rafraîchir dix plateformes à la main plusieurs fois par jour n'est pas tenable. Alternance Hunter fait ce travail à ma place, avec précision, et ne me sollicite que pour les offres qui valent vraiment le coup.
 
@@ -61,8 +61,8 @@ Le principe clé : chaque offre est stockée en base **avant** d'être proposée
 ## Installation
 
 ```bash
-git clone https://github.com/gab-spie/alternance-hunter.git
-cd alternance-hunter
+git clone https://github.com/gab-spie/career-hunter.git
+cd career-hunter
 python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 cp config.example.yaml config.yaml   # puis adaptez vos critères

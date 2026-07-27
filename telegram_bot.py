@@ -35,8 +35,13 @@ paused = False
 
 
 def api(method: str, **params):
-    r = requests.post(f"{API}/{method}", json=params, timeout=40)
-    return r.json()
+    """Appel Telegram resilient : ne leve jamais, renvoie {} en cas de souci reseau."""
+    try:
+        r = requests.post(f"{API}/{method}", json=params, timeout=40)
+        return r.json()
+    except Exception as e:  # noqa: BLE001
+        print(f"  api {method} KO: {e}")
+        return {}
 
 
 def kb(rows):
@@ -63,7 +68,10 @@ def send_card(conn, o):
     res = api("sendMessage", chat_id=CHAT_ID, text=card_text(o),
               parse_mode="HTML", reply_markup=markup)
     mid = res.get("result", {}).get("message_id")
-    db.set_status(conn, o["id"], "proposed", tg_message_id=mid)
+    # si l'envoi a echoue (pas de message_id), on laisse l'offre en 'pending'
+    # pour la reproposer, plutot que de la perdre en 'proposed'
+    if mid:
+        db.set_status(conn, o["id"], "proposed", tg_message_id=mid)
 
 
 def send_next(conn):
@@ -125,6 +133,8 @@ def on_pass(conn, oid, chat_id, mid):
 
 def on_applied(conn, oid, chat_id, mid):
     o = db.get_offer(conn, oid)
+    if not o:
+        return
     db.set_applied(conn, oid, date.today().isoformat())
     sink.regenerate(conn, PROFIL)
     _sync_sheet()
@@ -168,8 +178,12 @@ def handle_message(conn, msg):
 
 def main():
     conn = db.connect()
-    api("deleteWebhook")
-    send_digest(conn)
+    # demarrage protege : un hoquet reseau ou un verrou ne doit pas tuer le bot
+    try:
+        api("deleteWebhook")
+        send_digest(conn)
+    except Exception as e:  # noqa: BLE001
+        print("erreur demarrage:", e)
     offset = None
     while True:
         try:
@@ -179,10 +193,14 @@ def main():
             res = requests.get(f"{API}/getUpdates", params=params, timeout=35).json()
             for u in res.get("result", []):
                 offset = u["update_id"] + 1
-                if "callback_query" in u:
-                    handle_callback(conn, u["callback_query"])
-                elif "message" in u:
-                    handle_message(conn, u["message"])
+                # un update qui plante ne doit pas casser le traitement des suivants
+                try:
+                    if "callback_query" in u:
+                        handle_callback(conn, u["callback_query"])
+                    elif "message" in u:
+                        handle_message(conn, u["message"])
+                except Exception as e:  # noqa: BLE001
+                    print("erreur update:", e)
         except Exception as e:  # noqa: BLE001
             print("erreur boucle:", e)
             time.sleep(3)

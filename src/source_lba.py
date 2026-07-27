@@ -73,9 +73,14 @@ def fetch(profil_cfg: dict, profil_nom: str, token: str,
             "longitude": lieu["longitude"],
             "radius": lieu.get("rayon_km", 30),
         }
-        r = requests.get(BASE, headers=headers, params=params, timeout=timeout)
-        r.raise_for_status()
-        data = r.json()
+        # une erreur sur un lieu ne doit pas perdre les offres des autres lieux
+        try:
+            r = requests.get(BASE, headers=headers, params=params, timeout=timeout)
+            r.raise_for_status()
+            data = r.json()
+        except Exception as e:  # noqa: BLE001
+            print(f"  lba lieu {lieu.get('nom', '?')} KO: {e}")
+            continue
         for job in data.get("jobs", []):
             o = normalize(job, profil_nom)
             if not o:

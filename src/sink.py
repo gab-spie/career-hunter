@@ -6,6 +6,7 @@ Memes colonnes que le futur onglet Google Sheet, pour une bascule sans douleur.
 """
 
 import csv
+import os
 from pathlib import Path
 
 import db
@@ -27,7 +28,8 @@ def _csv_path(profil: str) -> Path:
 def regenerate(conn, profil: str) -> Path:
     rows = db.list_for_sheet(conn, profil)
     path = _csv_path(profil)
-    with open(path, "w", newline="", encoding="utf-8") as fh:
+    tmp = path.with_suffix(".csv.tmp")
+    with open(tmp, "w", newline="", encoding="utf-8") as fh:
         w = csv.writer(fh)
         w.writerow(HEADERS)
         for r in rows:
@@ -37,4 +39,5 @@ def regenerate(conn, profil: str) -> Path:
                         (r["date_debut"] or ""), r["score"], r["url"],
                         r["source"], STATUT.get(r["queue_status"], r["queue_status"]),
                         applied, "", ""])
+    os.replace(tmp, path)   # remplacement atomique (jamais de fichier tronque)
     return path

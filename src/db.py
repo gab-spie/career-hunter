@@ -14,6 +14,7 @@ Etats d'une offre (colonne queue_status) :
 """
 
 import sqlite3
+import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -32,6 +33,7 @@ CREATE TABLE IF NOT EXISTS offers (
     lieu          TEXT,
     score         REAL,
     date_debut    TEXT,                   -- date de debut du contrat (contract.start)
+    dedup_key     TEXT,                   -- entreprise+titre normalises (anti-doublon inter-sources)
     queue_status  TEXT NOT NULL DEFAULT 'pending',
     tg_message_id INTEGER,                -- id du message Telegram
     sheet_row     INTEGER,                -- ligne dans le Google Sheet
@@ -46,7 +48,17 @@ CREATE INDEX IF NOT EXISTS idx_offers_status ON offers(profil, queue_status);
 _MIGRATIONS = {
     "date_debut": "ALTER TABLE offers ADD COLUMN date_debut TEXT",
     "applied_at": "ALTER TABLE offers ADD COLUMN applied_at TEXT",
+    "dedup_key": "ALTER TABLE offers ADD COLUMN dedup_key TEXT",
 }
+
+
+def dedup_key(entreprise, titre) -> str:
+    """Cle anti-doublon inter-sources : entreprise+titre normalises."""
+    def norm(s):
+        s = unicodedata.normalize("NFD", str(s or ""))
+        s = "".join(c for c in s if unicodedata.category(c) != "Mn").lower()
+        return " ".join(s.split())
+    return norm(entreprise) + "|" + norm(titre)
 
 
 def _migrate(conn: sqlite3.Connection) -> None:
@@ -62,8 +74,12 @@ def _now() -> str:
 
 
 def connect(db_path: Path = DB_PATH) -> sqlite3.Connection:
-    conn = sqlite3.connect(db_path)
+    # timeout : attend jusqu'a 30 s si la base est verrouillee (scan + bot en //)
+    conn = sqlite3.connect(db_path, timeout=30)
     conn.row_factory = sqlite3.Row
+    # WAL : lecteurs et ecrivain simultanes sans "database is locked"
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=30000")
     conn.executescript(SCHEMA)
     _migrate(conn)
     return conn
@@ -74,19 +90,35 @@ def offer_exists(conn: sqlite3.Connection, url: str) -> bool:
     return cur.fetchone() is not None
 
 
+def dup_exists(conn: sqlite3.Connection, key: str, profil: str) -> bool:
+    """Meme offre deja presente via une autre source (meme entreprise+titre)."""
+    if not key or key == "|":
+        return False
+    cur = conn.execute(
+        "SELECT 1 FROM offers WHERE dedup_key = ? AND profil = ? LIMIT 1",
+        (key, profil))
+    return cur.fetchone() is not None
+
+
 def add_offer(conn: sqlite3.Connection, offer: dict) -> bool:
-    """Ajoute une offre si son URL est nouvelle. Renvoie True si insere."""
+    """Ajoute une offre si nouvelle (URL et paire entreprise+titre). Renvoie True si insere."""
     if offer_exists(conn, offer["url"]):
         return False
+    key = dedup_key(offer.get("entreprise"), offer.get("titre"))
+    # dedup inter-sources UNIQUEMENT si l'entreprise est connue : sinon deux
+    # offres distinctes sans nom d'employeur (parsing rate) + intitule generique
+    # auraient la meme cle et l'une serait perdue en silence.
+    if offer.get("entreprise") and dup_exists(conn, key, offer.get("profil")):
+        return False  # deja proposee via une autre source
     now = _now()
     conn.execute(
         """
         INSERT INTO offers
             (url, source, external_id, profil, entreprise, titre, contrat,
-             lieu, score, date_debut, queue_status, found_at, updated_at)
+             lieu, score, date_debut, dedup_key, queue_status, found_at, updated_at)
         VALUES
             (:url, :source, :external_id, :profil, :entreprise, :titre,
-             :contrat, :lieu, :score, :date_debut, 'pending', :found_at, :updated_at)
+             :contrat, :lieu, :score, :date_debut, :dedup_key, 'pending', :found_at, :updated_at)
         """,
         {
             "external_id": None,
@@ -96,6 +128,7 @@ def add_offer(conn: sqlite3.Connection, offer: dict) -> bool:
             "lieu": None,
             "score": None,
             "date_debut": None,
+            "dedup_key": key,
             **offer,
             "found_at": now,
             "updated_at": now,

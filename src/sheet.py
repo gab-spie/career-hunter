@@ -48,26 +48,36 @@ def ensure_ws(sh, title, rows=200, cols=NCOLS):
 
 
 def _read_manual(ws):
-    """Recupere {lien: (resultat, notes)} deja saisis, pour ne pas les ecraser."""
-    out = {}
+    """Lignes deja dans l'onglet : {lien: ligne} + lignes sans lien mais non vides.
+    Tout est preserve, pour ne jamais ecraser une saisie manuelle."""
+    by_url, keyless = {}, []
     try:
         vals = ws.get_all_values()
     except Exception:
-        return out
+        return by_url, keyless
     for r in vals[1:]:
         if len(r) > COL_LIEN and r[COL_LIEN]:
-            res = r[COL_RESULTAT] if len(r) > COL_RESULTAT else ""
-            notes = r[COL_RESULTAT + 1] if len(r) > COL_RESULTAT + 1 else ""
-            out[r[COL_LIEN]] = (res, notes)
-    return out
+            by_url[r[COL_LIEN]] = r
+        elif any((c or "").strip() for c in r):
+            keyless.append(r)  # ligne ajoutee a la main sans lien (ex: candidature spontanee)
+    return by_url, keyless
 
 
-def _rows_from_db(conn, profil, manual, delai_jours):
+def _res_notes(row):
+    """Resultat + Notes d'une ligne existante (liste de cellules)."""
+    res = row[COL_RESULTAT] if len(row) > COL_RESULTAT else ""
+    notes = row[COL_RESULTAT + 1] if len(row) > COL_RESULTAT + 1 else ""
+    return res, notes
+
+
+def _rows_from_db(conn, profil, manual, keyless, delai_jours):
     today = date.today()
     out = []
+    db_urls = set()
     for r in db.list_for_sheet(conn, profil):
         url = r["url"]
-        res, notes = manual.get(url, ("", ""))
+        db_urls.add(url)
+        res, notes = _res_notes(manual.get(url, []))
         # auto "Plus de 3 semaines" si postule depuis > delai et resultat vide
         if not res and r["queue_status"] == "applied" and r["applied_at"]:
             try:
@@ -83,6 +93,13 @@ def _rows_from_db(conn, profil, manual, delai_jours):
             STATUT.get(r["queue_status"], r["queue_status"]),
             (r["applied_at"] or ""), res, notes,
         ])
+    # lignes ajoutees a la main dans l'onglet (URL absente de la DB) : preservees
+    for url, row in manual.items():
+        if url not in db_urls:
+            out.append((list(row) + [""] * NCOLS)[:NCOLS])
+    # lignes manuelles sans lien : preservees aussi
+    for row in keyless:
+        out.append((list(row) + [""] * NCOLS)[:NCOLS])
     return out
 
 
@@ -120,8 +137,8 @@ def sync_values(sh, conn, cfg, profil):
     onglet = cfg["profils"][profil]["onglet"]
     delai = cfg.get("comportement", {}).get("delai_sans_reponse_jours", 21)
     ws = ensure_ws(sh, onglet)
-    manual = _read_manual(ws)
-    data = [HEADERS] + _rows_from_db(conn, profil, manual, delai)
+    manual, keyless = _read_manual(ws)
+    data = [HEADERS] + _rows_from_db(conn, profil, manual, keyless, delai)
     ws.clear()
     ws.update(values=data, range_name="A1")
     ws.format("A1:L1", {"textFormat": {"bold": True,

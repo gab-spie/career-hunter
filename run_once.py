@@ -14,11 +14,18 @@ import notify  # noqa: E402
 
 def main():
     profil = sys.argv[1] if len(sys.argv) > 1 else "alternance"
-    new, pending = scan.scan_profil(profil)
+    try:
+        new, pending = scan.scan_profil(profil)
+    except Exception as e:  # noqa: BLE001
+        print("scan en echec:", e)
+        return
     print(f"{profil} : {new} nouvelle(s), {pending} en file")
     if new > 0:
-        notify.send_digest(profil)
-        print("digest envoye")
+        try:
+            notify.send_digest(profil)
+            print("digest envoye")
+        except Exception as e:  # noqa: BLE001
+            print("digest non envoye:", e)
 
 
 if __name__ == "__main__":
