@@ -1,16 +1,16 @@
 """
-Bot Telegram Career Hunter (raw API + long polling, leger et fiable).
+Career Hunter Telegram bot (raw API + long polling, light and reliable).
 
-Flux :
-  Demarrage -> digest "N offres, [Commencer]"
-  Commencer -> 1 carte a la fois
-  Carte     -> [Retenir] [Passer] [Pause]
-  Retenir   -> ecrit dans le miroir CSV/Sheet, carte devient [Postuler] [Marquer postule]
-  Passer    -> jamais reproposee, carte suivante
-  Pause     -> stoppe, /reprendre pour continuer
+Flow:
+  Startup -> digest "N offers, [Start]"
+  Start   -> one card at a time
+  Card    -> [Keep] [Skip] [Pause]
+  Keep    -> written to the CSV/Sheet mirror, card becomes [Apply] [Mark applied]
+  Skip    -> never proposed again, next card
+  Pause   -> stops, /resume to continue
 
-Usage : python3 telegram_bot.py [alternance|stage]
-Deux bots = deux instances (un token par profil).
+Usage: python3 telegram_bot.py [alternance|stage]
+Two bots = two instances (one token per profile).
 """
 
 import sys
@@ -35,12 +35,12 @@ paused = False
 
 
 def api(method: str, **params):
-    """Appel Telegram resilient : ne leve jamais, renvoie {} en cas de souci reseau."""
+    """Resilient Telegram call: never raises, returns {} on a network hiccup."""
     try:
         r = requests.post(f"{API}/{method}", json=params, timeout=40)
         return r.json()
     except Exception as e:  # noqa: BLE001
-        print(f"  api {method} KO: {e}")
+        print(f"  api {method} failed: {e}")
         return {}
 
 
@@ -49,27 +49,27 @@ def kb(rows):
 
 
 def card_text(o) -> str:
-    titre = html.escape(o["titre"] or "")
-    ent = html.escape(o["entreprise"] or "?")
-    lieu = html.escape(o["lieu"] or "?")
-    contrat = html.escape(o["contrat"] or "")
-    return (f"🎯 <b>{titre}</b>\n"
-            f"🏢 {ent} · 📍 {lieu}\n"
-            f"📄 {contrat}\n"
+    title = html.escape(o["titre"] or "")
+    company = html.escape(o["entreprise"] or "?")
+    location = html.escape(o["lieu"] or "?")
+    contract = html.escape(o["contrat"] or "")
+    return (f"🎯 <b>{title}</b>\n"
+            f"🏢 {company} · 📍 {location}\n"
+            f"📄 {contract}\n"
             f"⭐ {o['score']}/10")
 
 
 def send_card(conn, o):
     markup = kb([
-        [{"text": "✅ Retenir", "callback_data": f"keep:{o['id']}"},
-         {"text": "❌ Passer", "callback_data": f"pass:{o['id']}"}],
+        [{"text": "✅ Keep", "callback_data": f"keep:{o['id']}"},
+         {"text": "❌ Skip", "callback_data": f"pass:{o['id']}"}],
         [{"text": "⏸️ Pause", "callback_data": "pause"}],
     ])
     res = api("sendMessage", chat_id=CHAT_ID, text=card_text(o),
               parse_mode="HTML", reply_markup=markup)
     mid = res.get("result", {}).get("message_id")
-    # si l'envoi a echoue (pas de message_id), on laisse l'offre en 'pending'
-    # pour la reproposer, plutot que de la perdre en 'proposed'
+    # if the send failed (no message_id), leave the offer 'pending' to re-propose
+    # it, rather than losing it as 'proposed'
     if mid:
         db.set_status(conn, o["id"], "proposed", tg_message_id=mid)
 
@@ -80,7 +80,7 @@ def send_next(conn):
     o = db.next_pending(conn, PROFIL)
     if not o:
         api("sendMessage", chat_id=CHAT_ID,
-            text="✅ File vide, tout est traite. Beau boulot.")
+            text="✅ Queue empty, all done. Nice work.")
         return
     send_card(conn, o)
 
@@ -89,20 +89,20 @@ def send_digest(conn):
     n = db.count_pending(conn, PROFIL)
     if n == 0:
         api("sendMessage", chat_id=CHAT_ID,
-            text=f"☀️ Rien de nouveau cote {PROFIL}. Je reste en veille.")
+            text=f"☀️ Nothing new for {PROFIL}. Standing by.")
         return
     api("sendMessage", chat_id=CHAT_ID,
-        text=f"☀️ {n} offre(s) {PROFIL} a passer en revue.",
-        reply_markup=kb([[{"text": "▶️ Commencer", "callback_data": "begin"}]]))
+        text=f"☀️ {n} {PROFIL} offer(s) to review.",
+        reply_markup=kb([[{"text": "▶️ Start", "callback_data": "begin"}]]))
 
 
 def _sync_sheet():
-    """Pousse l'onglet Google Sheet. Silencieux si hors-ligne : la DB et le
-    CSV restent la source de verite, la Sheet se resynchronisera au scan suivant."""
+    """Push the Google Sheet tab. Silent if offline: the DB and CSV stay the
+    source of truth, the Sheet re-syncs on the next scan."""
     try:
         sheet.quick_push(PROFIL)
-    except Exception as e:
-        print("  (Google Sheet non mis a jour maintenant:", e, ")")
+    except Exception as e:  # noqa: BLE001
+        print("  (Google Sheet not updated now:", e, ")")
 
 
 def on_keep(conn, oid, chat_id, mid):
@@ -112,10 +112,10 @@ def on_keep(conn, oid, chat_id, mid):
     db.set_status(conn, oid, "kept")
     sink.regenerate(conn, PROFIL)
     _sync_sheet()
-    txt = f"✅ <b>Retenue</b>\n🏢 {html.escape(o['entreprise'] or '?')} · {html.escape(o['titre'] or '')}"
+    txt = f"✅ <b>Kept</b>\n🏢 {html.escape(o['entreprise'] or '?')} · {html.escape(o['titre'] or '')}"
     markup = kb([
-        [{"text": "🔗 Postuler", "url": o["url"]}],
-        [{"text": "✔️ Marquer postule", "callback_data": f"applied:{oid}"}],
+        [{"text": "🔗 Apply", "url": o["url"]}],
+        [{"text": "✔️ Mark applied", "callback_data": f"applied:{oid}"}],
     ])
     api("editMessageText", chat_id=chat_id, message_id=mid, text=txt,
         parse_mode="HTML", reply_markup=markup)
@@ -125,9 +125,9 @@ def on_keep(conn, oid, chat_id, mid):
 def on_pass(conn, oid, chat_id, mid):
     o = db.get_offer(conn, oid)
     db.set_status(conn, oid, "passed")
-    titre = html.escape(o["titre"] or "") if o else ""
+    title = html.escape(o["titre"] or "") if o else ""
     api("editMessageText", chat_id=chat_id, message_id=mid,
-        text=f"❌ Passee · {titre}", parse_mode="HTML")
+        text=f"❌ Skipped · {title}", parse_mode="HTML")
     send_next(conn)
 
 
@@ -138,7 +138,7 @@ def on_applied(conn, oid, chat_id, mid):
     db.set_applied(conn, oid, date.today().isoformat())
     sink.regenerate(conn, PROFIL)
     _sync_sheet()
-    txt = (f"✔️ <b>Postule</b> le {date.today().isoformat()}\n"
+    txt = (f"✔️ <b>Applied</b> on {date.today().isoformat()}\n"
            f"🏢 {html.escape(o['entreprise'] or '?')} · {html.escape(o['titre'] or '')}")
     api("editMessageText", chat_id=chat_id, message_id=mid, text=txt, parse_mode="HTML")
 
@@ -156,7 +156,7 @@ def handle_callback(conn, cq):
     elif data == "pause":
         paused = True
         api("sendMessage", chat_id=chat_id,
-            text="⏸️ En pause. Tape /reprendre quand tu veux continuer.")
+            text="⏸️ Paused. Type /resume whenever you want to continue.")
     elif data.startswith("keep:"):
         on_keep(conn, int(data[5:]), chat_id, mid)
     elif data.startswith("pass:"):
@@ -168,22 +168,22 @@ def handle_callback(conn, cq):
 def handle_message(conn, msg):
     global paused
     text = (msg.get("text") or "").strip().lower()
-    if text in ("/go", "/reprendre", "/start"):
+    if text in ("/go", "/resume", "/start"):
         paused = False
         if text == "/start":
             api("sendMessage", chat_id=msg["chat"]["id"],
-                text="Bot Career Hunter pret. Tape /go pour voir les offres.")
+                text="Career Hunter bot ready. Type /go to see offers.")
         send_digest(conn) if text == "/start" else send_next(conn)
 
 
 def main():
     conn = db.connect()
-    # demarrage protege : un hoquet reseau ou un verrou ne doit pas tuer le bot
+    # protected startup: a network hiccup or a lock must not kill the bot
     try:
         api("deleteWebhook")
         send_digest(conn)
     except Exception as e:  # noqa: BLE001
-        print("erreur demarrage:", e)
+        print("startup error:", e)
     offset = None
     while True:
         try:
@@ -193,16 +193,16 @@ def main():
             res = requests.get(f"{API}/getUpdates", params=params, timeout=35).json()
             for u in res.get("result", []):
                 offset = u["update_id"] + 1
-                # un update qui plante ne doit pas casser le traitement des suivants
+                # one failing update must not break processing of the next ones
                 try:
                     if "callback_query" in u:
                         handle_callback(conn, u["callback_query"])
                     elif "message" in u:
                         handle_message(conn, u["message"])
                 except Exception as e:  # noqa: BLE001
-                    print("erreur update:", e)
+                    print("update error:", e)
         except Exception as e:  # noqa: BLE001
-            print("erreur boucle:", e)
+            print("loop error:", e)
             time.sleep(3)
 
 

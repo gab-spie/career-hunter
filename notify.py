@@ -1,7 +1,7 @@
 """
-Envoi du digest Telegram ("N offres [Commencer]") pour un profil.
-Utilise par le scan planifie : apres un scan, si de nouvelles offres sont
-en file, on previent. Le bot (qui tourne en continu) gere le bouton Commencer.
+Send the Telegram digest ("N offers [Start]") for a profile.
+Used by the scheduled scan: after a scan, if new offers are queued, we ping.
+The bot (running continuously) handles the Start button.
 """
 
 import sys
@@ -23,13 +23,13 @@ def send_digest(profil: str) -> int:
         f"https://api.telegram.org/bot{token}/sendMessage",
         json={
             "chat_id": chat,
-            "text": f"☀️ {n} nouvelle(s) offre(s) {profil} a passer en revue.",
+            "text": f"☀️ {n} new {profil} offer(s) to review.",
             "reply_markup": {"inline_keyboard": [
-                [{"text": "▶️ Commencer", "callback_data": "begin"}]]},
+                [{"text": "▶️ Start", "callback_data": "begin"}]]},
         }, timeout=30)
     return n
 
 
 if __name__ == "__main__":
     p = sys.argv[1] if len(sys.argv) > 1 else "alternance"
-    print("digest envoye pour", p, ":", send_digest(p), "offre(s)")
+    print("digest sent for", p, ":", send_digest(p), "offer(s)")

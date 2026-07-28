@@ -5,12 +5,12 @@ import pytest
 def cfg():
     """Minimal scoring config for tests."""
     return {
-        "mots_cles": {
-            "forts": ["m&a", "private equity", "corporate finance"],
-            "moyens": ["analyste financier"],
-            "exclus_durs": ["avocat", "juridique"],
-            "exclus": ["vente", "commercial", "comptable"],
+        "keywords": {
+            "strong": ["m&a", "private equity", "corporate finance"],
+            "medium": ["financial analyst"],
+            "hard_exclude": ["lawyer", "legal"],
+            "exclude": ["sales", "retail", "accountant"],
         },
-        "entreprises_cibles": {"bonus": 3.5, "noms": ["rothschild", "bnp paribas"]},
-        "diplome": {"cible_europeen": 7, "bonus_si_cible": 2.0, "malus_si_trop_bas": 3.0},
+        "target_employers": {"bonus": 3.5, "names": ["rothschild", "bnp paribas"]},
+        "degree": {"target_eu": 7, "bonus_if_target": 2.0, "penalty_if_low": 3.0},
     }

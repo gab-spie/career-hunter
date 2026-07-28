@@ -1,8 +1,8 @@
 """
-Scan : recupere les offres, les score, et met en file (DB) celles qui
-depassent le seuil du profil. A lancer 1x/jour (ou a la main).
+Scan: collect offers, score them, and queue (in the DB) those above the
+profile threshold. Run once a day (or by hand).
 
-Usage : python3 scan.py [alternance|stage]
+Usage: python3 scan.py [alternance|stage]
 """
 
 import sys
@@ -16,66 +16,66 @@ import contrat
 import db
 
 
-def _collect(profil_nom, pcfg, cfg):
-    """Recupere les offres de toutes les sources actives.
-    Les sources complementaires sont optionnelles : si leur module n'est pas
-    present, on continue avec l'API officielle seule."""
-    offres = []
-    # 1) La Bonne Alternance (API officielle, France, alternance)
+def _collect(profile_name, pcfg, cfg):
+    """Collect offers from every active source.
+    Extra sources are optional: if a module is missing, we keep going with the
+    official API alone."""
+    offers = []
+    # 1) official API (La Bonne Alternance, France, work-study)
     try:
         token = appconfig.read_secret("secrets/lba_token.txt")
-        offres += source_lba.fetch(pcfg, profil_nom, token)
-    except Exception as e:
-        print("  source La Bonne Alternance KO:", e)
-    # 2+) Sources complementaires listees dans le config (chargees si presentes)
-    for mod_nom in cfg.get("sources_extra", []):
+        offers += source_lba.fetch(pcfg, profile_name, token)
+    except Exception as e:  # noqa: BLE001
+        print("  official API source failed:", e)
+    # 2+) extra sources listed in the config (loaded if present)
+    for mod_name in cfg.get("extra_sources", []):
         try:
-            mod = __import__(mod_nom)
+            mod = __import__(mod_name)
         except ImportError:
             continue
         try:
-            offres += mod.fetch(profil_nom, cfg)
-        except Exception as e:
-            print(f"  source {mod_nom} KO:", e)
-    return offres
+            offers += mod.fetch(profile_name, cfg)
+        except Exception as e:  # noqa: BLE001
+            print(f"  source {mod_name} failed:", e)
+    return offers
 
 
-def scan_profil(profil_nom: str) -> tuple[int, int]:
+def scan_profil(profile_name: str) -> tuple[int, int]:
     cfg = appconfig.load_config()
-    pcfg = cfg["profils"][profil_nom]
-    seuil = pcfg["score_min_alerte"]
+    pcfg = cfg["profiles"][profile_name]
+    threshold = pcfg["min_score"]
 
-    offres = _collect(profil_nom, pcfg, cfg)
-    rentree = pcfg.get("rentree")
+    offers = _collect(profile_name, pcfg, cfg)
+    intake = pcfg.get("intake")
     conn = db.connect()
-    nouvelles = 0
-    hors_date = 0
-    hors_contrat = 0
-    ignorees = 0
-    for o in offres:
-        # une offre malformee (cle manquante, source future) ne casse pas le scan
+    new_count = 0
+    off_intake = 0
+    wrong_contract = 0
+    skipped = 0
+    for o in offers:
+        # a malformed offer (missing key, future source) must not break the scan
         try:
             if not o.get("url") or not o.get("titre"):
-                ignorees += 1
+                skipped += 1
                 continue
-            # filtre type de contrat STRICT (alternance-only ou stage-only)
-            if not contrat.type_ok(o, profil_nom):
-                hors_contrat += 1
+            # STRICT contract-type filter (work-study-only or internship-only)
+            if not contrat.type_ok(o, profile_name):
+                wrong_contract += 1
                 continue
-            # filtre rentree visee (ex septembre 2027)
-            if rentree and not datematch.passe(o, rentree):
-                hors_date += 1
+            # target-intake filter (e.g. September 2027)
+            if intake and not datematch.passes(o, intake):
+                off_intake += 1
                 continue
             r = scoring.score_offer(o.get("titre") or "", o.get("description") or "",
                                     o.get("diplome_eu"), cfg,
-                                    entreprise=o.get("entreprise") or "")
-            if r["exclue"] or r["score"] < seuil:
+                                    company=o.get("entreprise") or "")
+            if r["excluded"] or r["score"] < threshold:
                 continue
             rec = {
                 "url": o["url"],
-                "source": o.get("source") or "inconnue",
+                "source": o.get("source") or "unknown",
                 "external_id": o.get("external_id"),
-                "profil": profil_nom,
+                "profil": profile_name,
                 "entreprise": o.get("entreprise"),
                 "titre": o["titre"],
                 "contrat": o.get("contrat"),
@@ -84,16 +84,16 @@ def scan_profil(profil_nom: str) -> tuple[int, int]:
                 "date_debut": (o.get("date_debut") or "")[:10] or None,
             }
             if db.add_offer(conn, rec):
-                nouvelles += 1
+                new_count += 1
         except Exception as e:  # noqa: BLE001
-            ignorees += 1
-            print("  offre ignoree (erreur):", e)
-    print(f"  ({len(offres)} brutes, {hors_contrat} mauvais contrat, "
-          f"{hors_date} hors rentree cible, {ignorees} ignorees)")
-    return nouvelles, db.count_pending(conn, profil_nom)
+            skipped += 1
+            print("  offer skipped (error):", e)
+    print(f"  ({len(offers)} raw, {wrong_contract} wrong contract, "
+          f"{off_intake} off-intake, {skipped} skipped)")
+    return new_count, db.count_pending(conn, profile_name)
 
 
 if __name__ == "__main__":
     profil = sys.argv[1] if len(sys.argv) > 1 else "alternance"
     new, pending = scan_profil(profil)
-    print(f"{profil} : {new} nouvelle(s) offre(s), {pending} en attente dans la file")
+    print(f"{profil}: {new} new offer(s), {pending} waiting in the queue")

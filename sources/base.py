@@ -20,7 +20,7 @@ Normalized offer (a plain dict):
     }
 
 To add a source: create a module with a ``fetch`` function matching
-``Source`` below, then enable it in ``config.yaml`` under ``sources_extra``.
+``Source`` below, then enable it in ``config.yaml`` under ``extra_sources``.
 See ``sources/example_source.py`` for a template. Concrete connectors (such as
 ``src/source_lba.py``, which calls an official public API) implement this exact
 contract.

@@ -1,11 +1,11 @@
 """
-Connecteur source : La Bonne Alternance (API officielle apprentissage.beta.gouv.fr).
+Source connector: La Bonne Alternance (official API, apprentissage.beta.gouv.fr).
 
 GET /api/job/v1/search?latitude=..&longitude=..&radius=..
 Header: Authorization: Bearer <token>
 
-Renvoie une liste d'offres normalisees (dicts) pretes pour le scoring et la DB.
-France + alternance uniquement.
+Returns a list of normalized offers (dicts) ready for scoring and the DB.
+France + work-study only.
 """
 
 import requests
@@ -20,8 +20,8 @@ def _pick(*vals):
     return None
 
 
-def normalize(job: dict, profil: str) -> dict | None:
-    """Transforme une offre brute API en offre normalisee. None si inutilisable."""
+def normalize(job: dict, profile: str) -> dict | None:
+    """Turn a raw API job into a normalized offer. None if unusable."""
     offer = job.get("offer") or {}
     workplace = job.get("workplace") or {}
     apply_ = job.get("apply") or {}
@@ -29,16 +29,16 @@ def normalize(job: dict, profil: str) -> dict | None:
     ident = job.get("identifier") or {}
 
     url = apply_.get("url")
-    titre = offer.get("title")
-    if not url or not titre:
-        return None  # sans lien ou sans titre, inexploitable
+    title = offer.get("title")
+    if not url or not title:
+        return None  # no link or no title: unusable
 
     loc = (workplace.get("location") or {}).get("address")
-    diplome_eu = (offer.get("target_diploma") or {}).get("european")
+    degree_eu = (offer.get("target_diploma") or {}).get("european")
     try:
-        diplome_eu = int(diplome_eu) if diplome_eu is not None else None
+        degree_eu = int(degree_eu) if degree_eu is not None else None
     except (ValueError, TypeError):
-        diplome_eu = None
+        degree_eu = None
 
     ctype = contract.get("type")
     if isinstance(ctype, list):
@@ -48,45 +48,45 @@ def normalize(job: dict, profil: str) -> dict | None:
         "url": url,
         "source": "labonnealternance",
         "external_id": ident.get("partner_job_id") or ident.get("id"),
-        "profil": profil,
+        "profil": profile,
         "entreprise": _pick(workplace.get("brand"),
                             workplace.get("legal_name"),
                             workplace.get("name")),
-        "titre": titre,
+        "titre": title,
         "contrat": ctype or "alternance",
         "lieu": loc,
         "date_debut": contract.get("start"),
-        "diplome_eu": diplome_eu,
+        "diplome_eu": degree_eu,
         "description": offer.get("description") or "",
     }
 
 
-def fetch(profil_cfg: dict, profil_nom: str, token: str,
+def fetch(profile_cfg: dict, profile_name: str, token: str,
           timeout: int = 30) -> list[dict]:
-    """Interroge l'API pour chaque lieu du profil, renvoie les offres normalisees."""
+    """Query the API for each of the profile's locations; return normalized offers."""
     headers = {"Authorization": f"Bearer {token}"}
     seen = set()
-    offres = []
-    for lieu in profil_cfg.get("lieux", []):
+    offers = []
+    for loc in profile_cfg.get("locations", []):
         params = {
-            "latitude": lieu["latitude"],
-            "longitude": lieu["longitude"],
-            "radius": lieu.get("rayon_km", 30),
+            "latitude": loc["latitude"],
+            "longitude": loc["longitude"],
+            "radius": loc.get("radius_km", 30),
         }
-        # une erreur sur un lieu ne doit pas perdre les offres des autres lieux
+        # an error on one location must not drop offers from the others
         try:
             r = requests.get(BASE, headers=headers, params=params, timeout=timeout)
             r.raise_for_status()
             data = r.json()
         except Exception as e:  # noqa: BLE001
-            print(f"  lba lieu {lieu.get('nom', '?')} KO: {e}")
+            print(f"  official API location {loc.get('name', '?')} failed: {e}")
             continue
         for job in data.get("jobs", []):
-            o = normalize(job, profil_nom)
+            o = normalize(job, profile_name)
             if not o:
                 continue
             if o["url"] in seen:
                 continue
             seen.add(o["url"])
-            offres.append(o)
-    return offres
+            offers.append(o)
+    return offers

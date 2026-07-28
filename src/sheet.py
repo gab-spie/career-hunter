@@ -1,11 +1,11 @@
 """
-Integration Google Sheet.
+Google Sheet integration.
 
-- onglets Alternance / Stage 2 alimentes par les bots
-- onglet Stage 1 = archive (import de Stages.xlsx AVEC ses couleurs)
-- colonne Resultat = menu deroulant, coloriage auto de la ligne
-- les saisies manuelles (Resultat, Notes) sont preservees a chaque sync
-- passage auto en "Plus de 3 semaines" 21 jours apres la candidature
+- profile tabs fed by the bots
+- an archive tab (import of a spreadsheet WITH its colors)
+- Outcome column = dropdown, automatic row coloring
+- manual edits (Outcome, Notes) are preserved on every sync
+- auto "No reply (3+ weeks)" a configurable number of days after applying
 """
 
 from datetime import date
@@ -19,17 +19,16 @@ import db
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets",
           "https://www.googleapis.com/auth/drive"]
 
-# Ordre des colonnes (Type et Contrat supprimes, Date debut + Notes ajoutees)
-HEADERS = ["Date ajout", "Entreprise", "Titre", "Lieu", "Date debut", "Score",
-           "Lien", "Source", "Statut", "Date candidature", "Resultat", "Notes"]
+HEADERS = ["Added", "Company", "Title", "Location", "Start date", "Score",
+           "Link", "Source", "Status", "Applied on", "Outcome", "Notes"]
 NCOLS = len(HEADERS)
-COL_LIEN = 6        # index 0-based de "Lien"
-COL_RESULTAT = 10   # index 0-based de "Resultat" (colonne K)
+COL_LINK = 6        # 0-based index of "Link"
+COL_OUTCOME = 10    # 0-based index of "Outcome" (column K)
 
-STATUT = {"kept": "A postuler", "applied": "Postule"}
+STATUS = {"kept": "To apply", "applied": "Applied"}
 
-# Options du menu deroulant Resultat
-RESULTAT_OPTIONS = ["Plus de 3 semaines", "Non", "Entretien", "Accepte", "En cours"]
+# Outcome dropdown options
+OUTCOME_OPTIONS = ["No reply (3+ weeks)", "Rejected", "Interview", "Accepted", "In progress"]
 
 
 def client(cfg):
@@ -48,56 +47,56 @@ def ensure_ws(sh, title, rows=200, cols=NCOLS):
 
 
 def _read_manual(ws):
-    """Lignes deja dans l'onglet : {lien: ligne} + lignes sans lien mais non vides.
-    Tout est preserve, pour ne jamais ecraser une saisie manuelle."""
+    """Existing rows in the tab: {link: row} + non-empty rows without a link.
+    Everything is preserved, so a manual edit is never overwritten."""
     by_url, keyless = {}, []
     try:
         vals = ws.get_all_values()
     except Exception:
         return by_url, keyless
     for r in vals[1:]:
-        if len(r) > COL_LIEN and r[COL_LIEN]:
-            by_url[r[COL_LIEN]] = r
+        if len(r) > COL_LINK and r[COL_LINK]:
+            by_url[r[COL_LINK]] = r
         elif any((c or "").strip() for c in r):
-            keyless.append(r)  # ligne ajoutee a la main sans lien (ex: candidature spontanee)
+            keyless.append(r)  # manual row without a link (e.g. spontaneous application)
     return by_url, keyless
 
 
-def _res_notes(row):
-    """Resultat + Notes d'une ligne existante (liste de cellules)."""
-    res = row[COL_RESULTAT] if len(row) > COL_RESULTAT else ""
-    notes = row[COL_RESULTAT + 1] if len(row) > COL_RESULTAT + 1 else ""
+def _outcome_notes(row):
+    """Outcome + Notes of an existing row (list of cells)."""
+    res = row[COL_OUTCOME] if len(row) > COL_OUTCOME else ""
+    notes = row[COL_OUTCOME + 1] if len(row) > COL_OUTCOME + 1 else ""
     return res, notes
 
 
-def _rows_from_db(conn, profil, manual, keyless, delai_jours):
+def _rows_from_db(conn, profil, manual, keyless, no_reply_days):
     today = date.today()
     out = []
     db_urls = set()
     for r in db.list_for_sheet(conn, profil):
         url = r["url"]
         db_urls.add(url)
-        res, notes = _res_notes(manual.get(url, []))
-        # auto "Plus de 3 semaines" si postule depuis > delai et resultat vide
+        res, notes = _outcome_notes(manual.get(url, []))
+        # auto "No reply (3+ weeks)" if applied more than N days ago and outcome empty
         if not res and r["queue_status"] == "applied" and r["applied_at"]:
             try:
-                jours = (today - date.fromisoformat(r["applied_at"][:10])).days
-                if jours >= delai_jours:
-                    res = "Plus de 3 semaines"
+                days = (today - date.fromisoformat(r["applied_at"][:10])).days
+                if days >= no_reply_days:
+                    res = "No reply (3+ weeks)"
             except ValueError:
                 pass
         out.append([
             (r["found_at"] or "")[:10],
             r["entreprise"], r["titre"], r["lieu"],
             (r["date_debut"] or ""), r["score"], url, r["source"],
-            STATUT.get(r["queue_status"], r["queue_status"]),
+            STATUS.get(r["queue_status"], r["queue_status"]),
             (r["applied_at"] or ""), res, notes,
         ])
-    # lignes ajoutees a la main dans l'onglet (URL absente de la DB) : preservees
+    # manual rows added in the tab (URL not in the DB): preserved
     for url, row in manual.items():
         if url not in db_urls:
             out.append((list(row) + [""] * NCOLS)[:NCOLS])
-    # lignes manuelles sans lien : preservees aussi
+    # manual rows without a link: preserved too
     for row in keyless:
         out.append((list(row) + [""] * NCOLS)[:NCOLS])
     return out
@@ -106,16 +105,16 @@ def _rows_from_db(conn, profil, manual, keyless, delai_jours):
 def _dropdown_request(ws):
     return {"setDataValidation": {
         "range": {"sheetId": ws.id, "startRowIndex": 1,
-                  "startColumnIndex": COL_RESULTAT, "endColumnIndex": COL_RESULTAT + 1},
+                  "startColumnIndex": COL_OUTCOME, "endColumnIndex": COL_OUTCOME + 1},
         "rule": {
             "condition": {"type": "ONE_OF_LIST",
-                          "values": [{"userEnteredValue": v} for v in RESULTAT_OPTIONS]},
+                          "values": [{"userEnteredValue": v} for v in OUTCOME_OPTIONS]},
             "showCustomUi": True, "strict": False,
         }}}
 
 
 def _color_rules(ws, sep=";"):
-    """Ligne entiere coloree selon Resultat (col K) : rouge = mort, vert = positif."""
+    """Whole row colored by Outcome (col K): red = dead, green = positive."""
     rng = {"sheetId": ws.id, "startRowIndex": 1, "startColumnIndex": 0,
            "endColumnIndex": NCOLS}
     def rule(regex, r, g, b):
@@ -127,18 +126,18 @@ def _color_rules(ws, sep=";"):
                 "format": {"backgroundColor": {"red": r, "green": g, "blue": b}},
             }}}}
     return [
-        rule("(?i)^non|refus|plus de 3|sans r", 0.96, 0.80, 0.80),  # rouge = mort
-        rule("(?i)entretien|accept|positif|oui", 0.85, 0.92, 0.83),  # vert = positif
+        rule("(?i)reject|no reply", 0.96, 0.80, 0.80),      # red = dead
+        rule("(?i)interview|accept", 0.85, 0.92, 0.83),     # green = positive
     ]
 
 
 def sync_values(sh, conn, cfg, profil):
-    """Reecrit les valeurs en preservant Resultat/Notes ; pose le menu deroulant."""
-    onglet = cfg["profils"][profil]["onglet"]
-    delai = cfg.get("comportement", {}).get("delai_sans_reponse_jours", 21)
-    ws = ensure_ws(sh, onglet)
+    """Rewrite values while preserving Outcome/Notes; set the dropdown."""
+    tab = cfg["profiles"][profil]["tab"]
+    no_reply_days = cfg.get("behavior", {}).get("no_reply_days", 21)
+    ws = ensure_ws(sh, tab)
     manual, keyless = _read_manual(ws)
-    data = [HEADERS] + _rows_from_db(conn, profil, manual, keyless, delai)
+    data = [HEADERS] + _rows_from_db(conn, profil, manual, keyless, no_reply_days)
     ws.clear()
     ws.update(values=data, range_name="A1")
     ws.format("A1:L1", {"textFormat": {"bold": True,
@@ -148,26 +147,26 @@ def sync_values(sh, conn, cfg, profil):
     ws.freeze(rows=1)
     try:
         sh.batch_update({"requests": [_dropdown_request(ws)]})
-    except Exception as e:
-        print("  (menu deroulant ignore:", e, ")")
+    except Exception as e:  # noqa: BLE001
+        print("  (dropdown skipped:", e, ")")
     return ws
 
 
 def push_profile(sh, conn, cfg, profil):
-    """Setup complet d'un onglet : valeurs + menu + regles de couleur (une fois)."""
+    """Full setup of a tab: values + dropdown + color rules (once)."""
     ws = sync_values(sh, conn, cfg, profil)
     locale = (sh.fetch_sheet_metadata().get("properties", {})
               .get("locale", "en_US"))
     sep = ";" if str(locale).lower().startswith("fr") else ","
     try:
         sh.batch_update({"requests": _color_rules(ws, sep)})
-    except Exception as e:
-        print("  (couleurs conditionnelles ignorees:", e, ")")
+    except Exception as e:  # noqa: BLE001
+        print("  (conditional colors skipped:", e, ")")
     return ws
 
 
 def quick_push(profil):
-    """Pour le bot : connexion + reecriture de l'onglet du profil."""
+    """For the bot: connect + rewrite the profile's tab."""
     cfg = appconfig.load_config()
     conn = db.connect()
     sh = client(cfg)
@@ -175,10 +174,10 @@ def quick_push(profil):
 
 
 # --------------------------------------------------------------------------
-# Import de l'archive Stages.xlsx avec ses couleurs
+# Import of an archive spreadsheet, keeping its colors
 # --------------------------------------------------------------------------
 def _excel_fill(cell):
-    """Couleur de fond d'une cellule Excel -> (r,g,b) 0..1, ou None."""
+    """Background color of an Excel cell -> (r,g,b) 0..1, or None."""
     if cell.fill is None or cell.fill.patternType != "solid":
         return None
     fg = cell.fill.fgColor
@@ -188,7 +187,7 @@ def _excel_fill(cell):
         h = fg.rgb[-6:]
         return (int(h[0:2], 16) / 255, int(h[2:4], 16) / 255, int(h[4:6], 16) / 255)
     if fg.type == "theme":
-        # approximations (theme Office par defaut)
+        # approximations (default Office theme)
         return {9: (0.80, 0.90, 0.75), 6: (0.80, 0.90, 0.75),
                 5: (0.99, 0.85, 0.70), 4: (0.99, 0.85, 0.70)}.get(fg.theme)
     return None
@@ -196,17 +195,17 @@ def _excel_fill(cell):
 
 def import_archive(sh, cfg, xlsx_path: Path):
     from openpyxl import load_workbook
-    onglet = cfg["google_sheet"]["onglet_archive"]
+    tab = cfg["google_sheet"]["archive_tab"]
     wb = load_workbook(xlsx_path)
     src = wb.active
 
     values, colors = [], []
     for row in src.iter_rows():
         values.append([("" if c.value is None else str(c.value)) for c in row])
-        colors.append(_excel_fill(row[0]))  # couleur = fond de la colonne A
+        colors.append(_excel_fill(row[0]))  # color = background of column A
 
     ncols = max((len(r) for r in values), default=10)
-    ws = ensure_ws(sh, onglet, rows=max(len(values) + 5, 50), cols=max(ncols, 10))
+    ws = ensure_ws(sh, tab, rows=max(len(values) + 5, 50), cols=max(ncols, 10))
     ws.clear()
     if not values:
         return ws, 0
@@ -214,10 +213,10 @@ def import_archive(sh, cfg, xlsx_path: Path):
     ws.format(f"A1:{chr(64 + ncols)}1", {"textFormat": {"bold": True}})
     ws.freeze(rows=1)
 
-    # couleurs de ligne (par blocs pour limiter les requetes)
+    # row colors (batched to limit requests)
     reqs = []
     for i, col in enumerate(colors):
-        if not col or i == 0:  # saute l'en-tete
+        if not col or i == 0:  # skip the header
             continue
         r, g, b = col
         reqs.append({"repeatCell": {

@@ -1,8 +1,8 @@
 """
-Miroir CSV local des offres retenues (en attendant le Google Sheet).
+Local CSV mirror of kept offers (a fallback next to the Google Sheet).
 
-Regenere data/kept_<profil>.csv depuis la base a chaque changement.
-Memes colonnes que le futur onglet Google Sheet, pour une bascule sans douleur.
+Rebuilds data/kept_<profil>.csv from the DB on every change.
+Same columns as the Google Sheet tab, for a painless switch.
 """
 
 import csv
@@ -14,10 +14,10 @@ import db
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
 
-HEADERS = ["Date ajout", "Entreprise", "Titre", "Lieu", "Date debut", "Score",
-           "Lien", "Source", "Statut", "Date candidature", "Resultat", "Notes"]
+HEADERS = ["Added", "Company", "Title", "Location", "Start date", "Score",
+           "Link", "Source", "Status", "Applied on", "Outcome", "Notes"]
 
-STATUT = {"kept": "A postuler", "applied": "Postule"}
+STATUS = {"kept": "To apply", "applied": "Applied"}
 
 
 def _csv_path(profil: str) -> Path:
@@ -37,7 +37,7 @@ def regenerate(conn, profil: str) -> Path:
             applied = (r["applied_at"] or "")[:10]
             w.writerow([found, r["entreprise"], r["titre"], r["lieu"],
                         (r["date_debut"] or ""), r["score"], r["url"],
-                        r["source"], STATUT.get(r["queue_status"], r["queue_status"]),
+                        r["source"], STATUS.get(r["queue_status"], r["queue_status"]),
                         applied, "", ""])
-    os.replace(tmp, path)   # remplacement atomique (jamais de fichier tronque)
+    os.replace(tmp, path)   # atomic replace (never a truncated file)
     return path

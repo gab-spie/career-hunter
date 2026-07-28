@@ -3,7 +3,7 @@ Example source (template).
 
 Copy this file, rename it, and implement ``fetch()`` to query your own source
 (an API, a feed, a public listing...). Return normalized offers as described in
-``sources/base.py``. Enable it by adding the module name to ``sources_extra``
+``sources/base.py``. Enable it by adding the module name to ``extra_sources``
 in ``config.yaml``.
 
 This example returns static data so the interface can be exercised without any
@@ -35,5 +35,5 @@ class ExampleSource:
 
 
 def fetch(profile: str, config: dict) -> list[dict]:
-    """Module-level entry point used by the pipeline (config `sources_extra`)."""
+    """Module-level entry point used by the pipeline (config `extra_sources`)."""
     return ExampleSource.fetch(profile, config)

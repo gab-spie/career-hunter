@@ -30,4 +30,4 @@ This folder is excluded from the repo by `.gitignore`.
 
 ## Additional sources
 
-The project exposes a simple source interface: a Python module providing a `fetch(profile, config)` function that returns a list of normalized offers. A source is enabled by adding it to `sources_extra` in the config. The rest of the pipeline (filters, scoring, delivery, tracking) does not change.
+The project exposes a simple source interface: a Python module providing a `fetch(profile, config)` function that returns a list of normalized offers. A source is enabled by adding it to `extra_sources` in the config. The rest of the pipeline (filters, scoring, delivery, tracking) does not change.

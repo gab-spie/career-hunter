@@ -91,7 +91,7 @@ pytest                              # run the test suite
 
 Operational on the work-study side (collection, scoring, Telegram, Google Sheets, scheduling). Internship side and international sources in progress.
 
-> **A note on language.** The documentation, tests and the public source interface are written in English. Inline comments and the internal domain vocabulary (config keys, log messages) are in French, the author's working language and that of the target market (French work-study and internship recruiting).
+> **A note on language.** Documentation, configuration, comments and messages are in English. A few internal identifiers keep the author's French naming: the offer/DB field names (`titre`, `entreprise`, `lieu`...) and the profile ids `alternance` / `stage`, which are the French work-study and internship contracts and also serve as the CLI argument.
 
 ## License
 

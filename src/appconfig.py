@@ -1,4 +1,4 @@
-"""Chargement du config.yaml et des secrets."""
+"""Loading of config.yaml and secrets."""
 
 from pathlib import Path
 import yaml
@@ -13,6 +13,6 @@ def load_config() -> dict:
 
 
 def read_secret(rel_path: str) -> str:
-    """Lit un fichier secret (ex: secrets/lba_token.txt) et renvoie son contenu."""
+    """Read a secret file (e.g. secrets/lba_token.txt) and return its content."""
     p = ROOT / rel_path
     return p.read_text(encoding="utf-8").strip()

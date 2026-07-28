@@ -1,16 +1,19 @@
 """
-Base locale SQLite : anti-doublon + file d'attente Telegram.
+Local SQLite store: deduplication + Telegram queue.
 
-Source de verite. Une offre est stockee ici AVANT d'etre proposee sur
-Telegram. Meme si Telegram plante ou que tu fermes tout, rien n'est perdu
-et rien n'est propose deux fois.
+Source of truth. An offer is stored here BEFORE being proposed on Telegram.
+Even if Telegram crashes or everything is closed, nothing is lost and nothing
+is proposed twice.
 
-Etats d'une offre (colonne queue_status) :
-  pending   -> trouvee, pas encore proposee
-  proposed  -> carte envoyee sur Telegram, en attente de ton clic
-  kept      -> tu as clique "Retenir" (ecrite dans le Google Sheet)
-  passed    -> tu as clique "Passer" (jamais reproposee)
-  applied   -> tu as clique "Marquer postule" (statut Postule + date)
+Offer states (queue_status column):
+  pending   -> found, not yet proposed
+  proposed  -> card sent on Telegram, awaiting your click
+  kept      -> you clicked "Keep" (written to the Google Sheet)
+  passed    -> you clicked "Skip" (never proposed again)
+  applied   -> you clicked "Mark applied" (status Applied + date)
+
+Note: table columns and dict keys keep the author's French naming
+(entreprise, titre, lieu...). See the language note in the README.
 """
 
 import sqlite3
@@ -23,28 +26,28 @@ DB_PATH = Path(__file__).resolve().parent.parent / "career_hunter.sqlite3"
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS offers (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    url           TEXT UNIQUE NOT NULL,   -- cle anti-doublon
-    source        TEXT NOT NULL,          -- ex: labonnealternance, wttj
-    external_id   TEXT,                   -- id cote source si dispo
+    url           TEXT UNIQUE NOT NULL,   -- dedup key
+    source        TEXT NOT NULL,          -- e.g. labonnealternance
+    external_id   TEXT,                   -- source-side id if available
     profil        TEXT NOT NULL,          -- alternance | stage
-    entreprise    TEXT,
-    titre         TEXT,
-    contrat       TEXT,
-    lieu          TEXT,
+    entreprise    TEXT,                   -- company
+    titre         TEXT,                   -- title
+    contrat       TEXT,                   -- contract
+    lieu          TEXT,                   -- location
     score         REAL,
-    date_debut    TEXT,                   -- date de debut du contrat (contract.start)
-    dedup_key     TEXT,                   -- entreprise+titre normalises (anti-doublon inter-sources)
+    date_debut    TEXT,                   -- contract start date
+    dedup_key     TEXT,                   -- normalized company+title (cross-source dedup)
     queue_status  TEXT NOT NULL DEFAULT 'pending',
-    tg_message_id INTEGER,                -- id du message Telegram
-    sheet_row     INTEGER,                -- ligne dans le Google Sheet
-    applied_at    TEXT,                   -- date de candidature (clic Postule)
+    tg_message_id INTEGER,                -- Telegram message id
+    sheet_row     INTEGER,                -- row in the Google Sheet
+    applied_at    TEXT,                   -- application date (Applied click)
     found_at      TEXT NOT NULL,
     updated_at    TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_offers_status ON offers(profil, queue_status);
 """
 
-# Colonnes ajoutees apres coup : migration douce pour les bases existantes
+# Columns added later: soft migration for existing databases
 _MIGRATIONS = {
     "date_debut": "ALTER TABLE offers ADD COLUMN date_debut TEXT",
     "applied_at": "ALTER TABLE offers ADD COLUMN applied_at TEXT",
@@ -53,7 +56,7 @@ _MIGRATIONS = {
 
 
 def dedup_key(entreprise, titre) -> str:
-    """Cle anti-doublon inter-sources : entreprise+titre normalises."""
+    """Cross-source dedup key: normalized company+title."""
     def norm(s):
         s = unicodedata.normalize("NFD", str(s or ""))
         s = "".join(c for c in s if unicodedata.category(c) != "Mn").lower()
@@ -74,10 +77,10 @@ def _now() -> str:
 
 
 def connect(db_path: Path = DB_PATH) -> sqlite3.Connection:
-    # timeout : attend jusqu'a 30 s si la base est verrouillee (scan + bot en //)
+    # timeout: wait up to 30 s if the DB is locked (scan + bot in parallel)
     conn = sqlite3.connect(db_path, timeout=30)
     conn.row_factory = sqlite3.Row
-    # WAL : lecteurs et ecrivain simultanes sans "database is locked"
+    # WAL: concurrent readers and one writer without "database is locked"
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA busy_timeout=30000")
     conn.executescript(SCHEMA)
@@ -91,7 +94,7 @@ def offer_exists(conn: sqlite3.Connection, url: str) -> bool:
 
 
 def dup_exists(conn: sqlite3.Connection, key: str, profil: str) -> bool:
-    """Meme offre deja presente via une autre source (meme entreprise+titre)."""
+    """Same offer already present via another source (same company+title)."""
     if not key or key == "|":
         return False
     cur = conn.execute(
@@ -101,15 +104,15 @@ def dup_exists(conn: sqlite3.Connection, key: str, profil: str) -> bool:
 
 
 def add_offer(conn: sqlite3.Connection, offer: dict) -> bool:
-    """Ajoute une offre si nouvelle (URL et paire entreprise+titre). Renvoie True si insere."""
+    """Add an offer if new (by URL and by company+title). Return True if inserted."""
     if offer_exists(conn, offer["url"]):
         return False
     key = dedup_key(offer.get("entreprise"), offer.get("titre"))
-    # dedup inter-sources UNIQUEMENT si l'entreprise est connue : sinon deux
-    # offres distinctes sans nom d'employeur (parsing rate) + intitule generique
-    # auraient la meme cle et l'une serait perdue en silence.
+    # cross-source dedup ONLY when the company is known: otherwise two distinct
+    # offers with no parsed employer + a generic title would share the same key
+    # and one would be silently lost.
     if offer.get("entreprise") and dup_exists(conn, key, offer.get("profil")):
-        return False  # deja proposee via une autre source
+        return False  # already proposed via another source
     now = _now()
     conn.execute(
         """
@@ -139,7 +142,7 @@ def add_offer(conn: sqlite3.Connection, offer: dict) -> bool:
 
 
 def next_pending(conn: sqlite3.Connection, profil: str) -> sqlite3.Row | None:
-    """Prochaine offre a proposer, la mieux notee d'abord."""
+    """Next offer to propose, highest score first."""
     cur = conn.execute(
         """
         SELECT * FROM offers
@@ -190,7 +193,7 @@ def set_applied(conn: sqlite3.Connection, offer_id: int, when: str) -> None:
 
 
 def list_for_sheet(conn: sqlite3.Connection, profil: str) -> list[sqlite3.Row]:
-    """Offres retenues ou postulees, pour le Google Sheet / CSV miroir."""
+    """Kept or applied offers, for the Google Sheet / CSV mirror."""
     cur = conn.execute(
         """
         SELECT * FROM offers
@@ -205,16 +208,16 @@ def list_for_sheet(conn: sqlite3.Connection, profil: str) -> list[sqlite3.Row]:
 if __name__ == "__main__":
     c = connect()
     ok = add_offer(c, {
-        "url": "https://exemple.test/offre/1",
+        "url": "https://example.test/offer/1",
         "source": "test",
         "profil": "alternance",
         "entreprise": "ACME",
-        "titre": "Analyste M&A",
-        "contrat": "apprentissage",
+        "titre": "M&A Analyst",
+        "contrat": "apprenticeship",
         "lieu": "Paris",
         "score": 8.5,
     })
-    print("insere:", ok)
+    print("inserted:", ok)
     print("pending:", count_pending(c, "alternance"))
     row = next_pending(c, "alternance")
     print("next:", dict(row) if row else None)

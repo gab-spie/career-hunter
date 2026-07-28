@@ -1,41 +1,40 @@
 # =====================================================================
-# Career Hunter - configuration d'exemple
-# Copiez ce fichier en config.yaml et adaptez-le. Aucun secret ici :
-# les jetons et cles vont dans le dossier secrets/ (voir README).
+# Career Hunter - example configuration
+# Copy this file to config.yaml and adapt it. No secrets here:
+# tokens and keys live in the secrets/ folder (see README).
 # =====================================================================
 
-# Sources complementaires chargees dynamiquement (modules Python dans src/),
-# en plus de l'API officielle. Interface commune : une fonction fetch().
-# Laissez vide pour n'utiliser que l'API officielle.
-sources_extra: []
+# Extra source modules loaded dynamically (Python modules in src/), in
+# addition to the official API. Shared interface: a fetch() function.
+# Leave empty to use only the official API.
+extra_sources: []
 
-# Mots-cles du moteur de scoring (/10)
-mots_cles:
-  forts:            # coeur de cible (gros points)
+# Scoring keywords (out of 10)
+keywords:
+  strong:            # core target (big points)
     - "m&a"
     - "corporate finance"
     - "private equity"
     - "investment banking"
     - "transaction services"
     - "leveraged finance"
-  moyens:           # finance proche
-    - "analyste financier"
+  medium:            # adjacent finance
     - "financial analyst"
     - "asset management"
-  exclus_durs:      # ecarte toujours, meme avec un mot fort
-    - "avocat"
-    - "juridique"
-    - "notaire"
-  exclus:           # ecarte si dans le titre et aucun mot fort present
-    - "vente"
-    - "commercial"
-    - "comptable"
+  hard_exclude:      # always dropped, even with a strong keyword
+    - "lawyer"
+    - "legal"
+    - "notary"
+  exclude:           # dropped if in the title and no strong keyword is present
+    - "sales"
+    - "retail"
+    - "accountant"
     - "communication"
 
-# Employeurs cibles : bonus de score si l'offre vient de chez eux
-entreprises_cibles:
+# Target employers: score bonus when the offer comes from them
+target_employers:
   bonus: 3.5
-  noms:
+  names:
     - "goldman sachs"
     - "morgan stanley"
     - "rothschild"
@@ -44,35 +43,37 @@ entreprises_cibles:
     - "ardian"
     - "eurazeo"
 
-# Profils = onglets et bots distincts
-profils:
+# Profiles = separate tabs and bots. The profile id is also the CLI argument
+# (e.g. `python3 scan.py alternance`); "alternance" is the French work-study
+# contract and is kept as a domain term.
+profiles:
   alternance:
-    onglet: "Alternance"
-    type: "alternance"
-    contrats: ["apprentissage", "professionnalisation"]
-    lieux:
-      - nom: "Paris / Ile-de-France"
+    tab: "Work-study"
+    type: "work-study"
+    contracts: ["apprenticeship", "professionalization"]
+    locations:
+      - name: "Paris / Ile-de-France"
         latitude: 48.8566
         longitude: 2.3522
-        rayon_km: 30
-    score_min_alerte: 6.0
-    rentree:                 # ne garder qu'une rentree precise
-      annee: 2027
-      mois: [8, 9, 10, 11]
+        radius_km: 30
+    min_score: 6.0
+    intake:                 # keep only a specific intake
+      year: 2027
+      months: [8, 9, 10, 11]
       strict: true
 
-# Niveau de diplome vise (europeen : 5=Bac+2, 6=Bac+3, 7=Bac+5)
-diplome:
-  cible_europeen: 7
-  bonus_si_cible: 2.0
-  malus_si_trop_bas: 3.0
+# Target degree level (European scale: 5=Bac+2, 6=Bac+3, 7=Master)
+degree:
+  target_eu: 7
+  bonus_if_target: 2.0
+  penalty_if_low: 3.0
 
-# Google Sheet (l'ID est dans l'URL du classeur, entre /d/ et /edit)
+# Google Sheet (the id sits in the sheet URL, between /d/ and /edit)
 google_sheet:
   spreadsheet_id: "YOUR_GOOGLE_SHEET_ID"
   credentials_file: "secrets/google_service_account.json"
-  onglet_archive: "Archive"
+  archive_tab: "Archive"
 
-comportement:
-  delai_sans_reponse_jours: 21
-  max_offres_par_session: 0
+behavior:
+  no_reply_days: 21
+  max_offers_per_session: 0

@@ -1,20 +1,21 @@
 """
-Filtre de type de contrat, STRICT.
+STRICT contract-type filter.
 
-Le bot alternance ne garde QUE de l'alternance/apprentissage.
-Le bot stage ne garde QUE du stage.
-Tout le reste (CDI, graduate program, VIE...) est ecarte.
+The work-study feed keeps ONLY work-study / apprenticeship offers.
+The internship feed keeps ONLY internships.
+Everything else (permanent, graduate program, VIE...) is dropped.
 
-Signal utilise, par ordre de fiabilite :
-  - source alternance-only (La Bonne Alternance) -> alternance
-  - label de contrat de la source (eFinancialCareers) -> mot exact
-  - a defaut, mots dans le titre
+Signal used, in order of reliability:
+  - work-study-only source (official API) -> work-study
+  - contract label from the source -> exact word
+  - otherwise, words found in the title
 """
 
 import unicodedata
 
-ALT = ("altern", "apprenti")
-STG = ("stage", "stagiaire", "internship", "summer intern", "off-cycle", "summer analyst")
+WORK_STUDY = ("altern", "apprenti")
+INTERNSHIP = ("stage", "stagiaire", "internship", "summer intern",
+              "off-cycle", "summer analyst")
 
 
 def _n(s: str) -> str:
@@ -22,15 +23,15 @@ def _n(s: str) -> str:
     return "".join(c for c in s if unicodedata.category(c) != "Mn").lower()
 
 
-def type_ok(offer: dict, profil: str) -> bool:
+def type_ok(offer: dict, profile: str) -> bool:
     label = _n(offer.get("contrat_label") or "")
-    titre = _n(offer.get("titre") or "")
+    title = _n(offer.get("titre") or "")
     src = offer.get("source") or ""
-    blob = label + " " + titre
+    blob = label + " " + title
 
-    is_alt = (src == "labonnealternance") or any(w in blob for w in ALT)
-    is_stg = any(w in blob for w in STG)
+    is_work_study = (src == "labonnealternance") or any(w in blob for w in WORK_STUDY)
+    is_internship = any(w in blob for w in INTERNSHIP)
 
-    if profil == "alternance":
-        return is_alt
-    return is_stg  # profil stage
+    if profile == "alternance":
+        return is_work_study
+    return is_internship  # internship profile

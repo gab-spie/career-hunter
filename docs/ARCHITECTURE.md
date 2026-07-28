@@ -41,4 +41,4 @@ pending  ─▶ proposed ─▶ kept ─▶ applied
 
 ## Extensibility
 
-A source is a module exposing `fetch(profile, config) -> list[dict]`, each offer in the normalized format defined in `sources/base.py` (`url`, `titre`, `source`, `entreprise`, `lieu`, `contrat`, `date_debut`, `description`). It is enabled via `sources_extra` in the config. The downstream pipeline is identical for every source.
+A source is a module exposing `fetch(profile, config) -> list[dict]`, each offer in the normalized format defined in `sources/base.py` (`url`, `titre`, `source`, `entreprise`, `lieu`, `contrat`, `date_debut`, `description`). It is enabled via `extra_sources` in the config. The downstream pipeline is identical for every source.
