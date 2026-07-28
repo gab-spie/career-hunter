@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "career-hunter"
+version = "0.1.0"
+description = "Source-agnostic finance job aggregation, scoring and alerting engine."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Gabin Spiewak" }]
+keywords = ["job-search", "finance", "aggregator", "telegram-bot", "automation"]
+dependencies = [
+    "requests>=2.31",
+    "PyYAML>=6.0",
+    "gspread>=6.0",
+    "google-auth>=2.30",
+    "openpyxl>=3.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.urls]
+Repository = "https://github.com/gab-spie/career-hunter"
+
+[tool.setuptools]
+py-modules = ["scan", "run_once", "notify", "telegram_bot"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["sources*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src", "."]
+testpaths = ["tests"]

@@ -112,7 +112,7 @@ def on_keep(conn, oid, chat_id, mid):
     db.set_status(conn, oid, "kept")
     sink.regenerate(conn, PROFIL)
     _sync_sheet()
-    txt = f"✅ <b>Retenue</b>\n🏢 {html.escape(o['entreprise'] or '?')} — {html.escape(o['titre'] or '')}"
+    txt = f"✅ <b>Retenue</b>\n🏢 {html.escape(o['entreprise'] or '?')} · {html.escape(o['titre'] or '')}"
     markup = kb([
         [{"text": "🔗 Postuler", "url": o["url"]}],
         [{"text": "✔️ Marquer postule", "callback_data": f"applied:{oid}"}],
@@ -127,7 +127,7 @@ def on_pass(conn, oid, chat_id, mid):
     db.set_status(conn, oid, "passed")
     titre = html.escape(o["titre"] or "") if o else ""
     api("editMessageText", chat_id=chat_id, message_id=mid,
-        text=f"❌ Passee — {titre}", parse_mode="HTML")
+        text=f"❌ Passee · {titre}", parse_mode="HTML")
     send_next(conn)
 
 
@@ -139,7 +139,7 @@ def on_applied(conn, oid, chat_id, mid):
     sink.regenerate(conn, PROFIL)
     _sync_sheet()
     txt = (f"✔️ <b>Postule</b> le {date.today().isoformat()}\n"
-           f"🏢 {html.escape(o['entreprise'] or '?')} — {html.escape(o['titre'] or '')}")
+           f"🏢 {html.escape(o['entreprise'] or '?')} · {html.escape(o['titre'] or '')}")
     api("editMessageText", chat_id=chat_id, message_id=mid, text=txt, parse_mode="HTML")
 
 

@@ -51,8 +51,9 @@ Key principle: every offer is stored **before** being proposed. Even offline or 
 ## Technical highlights
 
 - **Custom scoring engine**: title-vs-description weighting, target-employer bonus, soft and hard exclusions, accent- and case-insensitive.
-- **Extensible source interface**: adding a source means dropping a module that exposes a `fetch()` function and enabling it in the config. The rest of the pipeline is untouched.
+- **Extensible source interface**: a source is any module exposing `fetch(profile, config)` and returning normalized offers. The contract lives in [`sources/base.py`](sources/base.py), with a ready-to-copy template in [`sources/example_source.py`](sources/example_source.py). The rest of the pipeline is untouched.
 - **Robustness**: URL and cross-source deduplication, persistent queue, WAL + busy-timeout for safe concurrent access, graceful degradation if a source fails (the scan continues on the others), atomic file writes.
+- **Tested**: unit tests on the real logic (scoring, contract and intake filters, deduplication) with `pytest`.
 - **Thoughtful UX**: one-by-one queue, pause/resume, the final click stays human, automatic color-coded tracking.
 - **Autonomy**: from collection to notification, no manual step.
 
@@ -64,15 +65,16 @@ Key principle: every offer is stored **before** being proposed. Even offline or 
 git clone https://github.com/gab-spie/career-hunter.git
 cd career-hunter
 python3 -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
+pip install -e ".[dev]"              # installs the package + test deps
 cp config.example.yaml config.yaml   # then adjust your criteria
 ```
 
-Credentials (API token, Telegram bot, Google service account) live in a `secrets/` folder deliberately excluded from the repo. See [`docs/ABOUT.md`](docs/ABOUT.md) for details.
+Credentials (API token, Telegram bot, Google service account) live in a `secrets/` folder deliberately excluded from the repo, or in a `.env` (see [`.env.example`](.env.example)). Details in [`docs/ABOUT.md`](docs/ABOUT.md).
 
 ```bash
 python3 scan.py alternance          # one scan
 python3 telegram_bot.py alternance  # the triage bot
+pytest                              # run the test suite
 ```
 
 ---
