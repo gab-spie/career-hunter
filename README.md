@@ -91,7 +91,7 @@ pytest                              # run the test suite
 
 Operational on the work-study side (collection, scoring, Telegram, Google Sheets, scheduling). Internship side and international sources in progress.
 
-> **A note on language.** Documentation, configuration, comments and messages are in English. A few internal identifiers keep the author's French naming: the offer/DB field names (`titre`, `entreprise`, `lieu`...) and the profile ids `alternance` / `stage`, which are the French work-study and internship contracts and also serve as the CLI argument.
+> **A note on language.** Documentation, configuration, comments and messages are in English. A few identifiers stay in the author's French, tied to the French domain and data model: the offer/DB field names (`titre`, `entreprise`, `lieu`, `contrat`, `date_debut`...) and the `profil` argument; the profile ids `alternance` / `stage` (the French work-study and internship contracts, also used as the CLI argument); the official source id `labonnealternance`; and a short list of French month names used to match French-language job titles.
 
 ## License
 

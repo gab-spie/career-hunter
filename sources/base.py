@@ -9,15 +9,20 @@ same for every source.
 Normalized offer (a plain dict):
 
     {
-        "url":         str,   # unique key, used for deduplication (required)
-        "titre":       str,   # job title (required)
-        "source":      str,   # source name, e.g. "official_api"
-        "entreprise":  str | None,
-        "lieu":        str | None,
-        "contrat":     str | None,   # contract type / label
-        "date_debut":  str | None,   # ISO start date if known
-        "description": str,          # may be empty
+        "url":           str,   # unique key, used for deduplication (required)
+        "titre":         str,   # job title (required)
+        "source":        str,   # source name, e.g. "official_api"
+        "entreprise":    str | None,   # company
+        "lieu":          str | None,   # location
+        "contrat":       str | None,   # contract type
+        "date_debut":    str | None,   # ISO start date if known
+        "description":   str,          # may be empty
+        # optional, used by richer sources to sharpen filtering:
+        "contrat_label": str | None,   # raw contract label from the source
+        "diplome_eu":    int | None,   # European degree level (5/6/7)
     }
+
+Field names keep the author's French naming (see the README language note).
 
 To add a source: create a module with a ``fetch`` function matching
 ``Source`` below, then enable it in ``config.yaml`` under ``extra_sources``.

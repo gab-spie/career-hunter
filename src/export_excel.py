@@ -23,7 +23,6 @@ STATUS = {"kept": "To apply", "applied": "Applied"}
 
 FILL_RED = PatternFill("solid", fgColor="F4CCCC")
 FILL_GREEN = PatternFill("solid", fgColor="D9EAD3")
-FILL_GREY = PatternFill("solid", fgColor="D9D9D9")
 FILL_HEADER = PatternFill("solid", fgColor="1F2A44")
 
 
@@ -48,12 +47,10 @@ def _read_existing(path: Path):
 
 def _fill_for(outcome: str):
     r = (outcome or "").lower()
-    if "reject" in r:
+    if "reject" in r or "no reply" in r:      # dead
         return FILL_RED
-    if "interview" in r or "accept" in r:
+    if "interview" in r or "accept" in r:     # positive
         return FILL_GREEN
-    if "no reply" in r:
-        return FILL_GREY
     return None
 
 

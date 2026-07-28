@@ -1,12 +1,12 @@
-# Secrets et identifiants (jamais versionnes)
+# Secrets and credentials (never versioned)
 secrets/
 .env
 *.json
 
-# Config personnelle (utiliser config.example.yaml comme modele)
+# Personal config (use config.example.yaml as a template)
 config.yaml
 
-# Donnees locales
+# Local data
 *.sqlite3
 *.db
 data/
