@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Exemple : bot Telegram maintenu en vie (repond aux boutons en continu).
-     Copier dans ~/Library/LaunchAgents/ en adaptant les chemins. -->
+<!-- Example: keep the Telegram bot alive (answers buttons continuously).
+     Copy into ~/Library/LaunchAgents/ with your own paths. -->
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.alternancehunter.bot</string>
+  <string>com.careerhunter.bot</string>
 
   <key>ProgramArguments</key>
   <array>
@@ -16,7 +16,7 @@
   </array>
 
   <key>WorkingDirectory</key>
-  <string>/Users/YOU/alternance-hunter</string>
+  <string>/Users/YOU/career-hunter</string>
 
   <key>RunAtLoad</key>
   <true/>
@@ -24,8 +24,8 @@
   <true/>
 
   <key>StandardOutPath</key>
-  <string>/Users/YOU/alternance-hunter/logs/bot.log</string>
+  <string>/Users/YOU/career-hunter/logs/bot.log</string>
   <key>StandardErrorPath</key>
-  <string>/Users/YOU/alternance-hunter/logs/bot.err.log</string>
+  <string>/Users/YOU/career-hunter/logs/bot.err.log</string>
 </dict>
 </plist>

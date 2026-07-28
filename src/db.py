@@ -18,7 +18,7 @@ import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
 
-DB_PATH = Path(__file__).resolve().parent.parent / "job_radar.sqlite3"
+DB_PATH = Path(__file__).resolve().parent.parent / "career_hunter.sqlite3"
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS offers (

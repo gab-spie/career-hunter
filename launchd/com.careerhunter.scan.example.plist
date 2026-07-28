@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Exemple de planification macOS : scan plusieurs fois par jour.
-     Copier dans ~/Library/LaunchAgents/ en adaptant les chemins,
-     puis : launchctl load -w ~/Library/LaunchAgents/<ce fichier>.plist -->
+<!-- Example macOS schedule: run a scan several times a day.
+     Copy into ~/Library/LaunchAgents/ with your own paths, then:
+     launchctl load -w ~/Library/LaunchAgents/<this file>.plist -->
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.alternancehunter.scan</string>
+  <string>com.careerhunter.scan</string>
 
   <key>ProgramArguments</key>
   <array>
@@ -17,7 +17,7 @@
   </array>
 
   <key>WorkingDirectory</key>
-  <string>/Users/YOU/alternance-hunter</string>
+  <string>/Users/YOU/career-hunter</string>
 
   <key>StartCalendarInterval</key>
   <array>
@@ -28,8 +28,8 @@
   </array>
 
   <key>StandardOutPath</key>
-  <string>/Users/YOU/alternance-hunter/logs/scan.log</string>
+  <string>/Users/YOU/career-hunter/logs/scan.log</string>
   <key>StandardErrorPath</key>
-  <string>/Users/YOU/alternance-hunter/logs/scan.err.log</string>
+  <string>/Users/YOU/career-hunter/logs/scan.err.log</string>
 </dict>
 </plist>

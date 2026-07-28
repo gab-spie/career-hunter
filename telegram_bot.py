@@ -1,5 +1,5 @@
 """
-Bot Telegram Job Radar (raw API + long polling, leger et fiable).
+Bot Telegram Career Hunter (raw API + long polling, leger et fiable).
 
 Flux :
   Demarrage -> digest "N offres, [Commencer]"
@@ -172,7 +172,7 @@ def handle_message(conn, msg):
         paused = False
         if text == "/start":
             api("sendMessage", chat_id=msg["chat"]["id"],
-                text="Bot Job Radar pret. Tape /go pour voir les offres.")
+                text="Bot Career Hunter pret. Tape /go pour voir les offres.")
         send_digest(conn) if text == "/start" else send_next(conn)
 
 

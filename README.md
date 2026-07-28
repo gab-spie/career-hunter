@@ -8,7 +8,7 @@ A personal project born from a simple observation: in a finance work-study or in
 
 ## What it does
 
-- **Aggregates several sources**: the official work-study API (La Bonne Alternance, a French public service backed by France Travail) plus additional public job sources, through an extensible source interface. The goal is maximum coverage so nothing slips through.
+- **Aggregates sources through an extensible interface**: ships with a connector for the official work-study API (La Bonne Alternance, a French public service backed by France Travail); additional public job sources can be plugged in without touching the pipeline. The goal is broad coverage so little slips through.
 - **Scores every offer out of 10** against a configurable profile: role keywords (M&A, Private Equity, Corporate Finance...), target employers (investment banks, boutiques, funds), degree level, and hard exclusions (e.g. drop legal roles even when the title mentions "M&A").
 - **Filters by target intake**: keeps only a specific campaign (e.g. September 2027), based on the start date or the year stated in the title.
 - **Strict contract-type filter**: work-study on one side, internships on the other, never mixed (a "graduate" or permanent role is dropped from the work-study feed).
@@ -69,7 +69,7 @@ pip install -e ".[dev]"              # installs the package + test deps
 cp config.example.yaml config.yaml   # then adjust your criteria
 ```
 
-Credentials (API token, Telegram bot, Google service account) live in a `secrets/` folder deliberately excluded from the repo, or in a `.env` (see [`.env.example`](.env.example)). Details in [`docs/ABOUT.md`](docs/ABOUT.md).
+Credentials (API token, Telegram bot, Google service account) live in a `secrets/` folder deliberately excluded from the repo. Details in [`docs/ABOUT.md`](docs/ABOUT.md).
 
 ```bash
 python3 scan.py alternance          # one scan
@@ -91,6 +91,8 @@ pytest                              # run the test suite
 
 Operational on the work-study side (collection, scoring, Telegram, Google Sheets, scheduling). Internship side and international sources in progress.
 
+> **A note on language.** The documentation, tests and the public source interface are written in English. Inline comments and the internal domain vocabulary (config keys, log messages) are in French, the author's working language and that of the target market (French work-study and internship recruiting).
+
 ## License
 
-MIT. Personal, non-commercial project.
+MIT License. A personal project.

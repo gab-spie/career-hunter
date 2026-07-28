@@ -2,7 +2,6 @@
 secrets/
 .env
 *.json
-!config.example.json
 
 # Config personnelle (utiliser config.example.yaml comme modele)
 config.yaml
