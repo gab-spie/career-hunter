@@ -1,20 +1,20 @@
 # Career Hunter
 
-**Radar d'offres finance automatisé (alternance et stage).** Il agrège les offres, les note selon un profil personnalisé, et livre les meilleures directement sur Telegram, une par une, avec un suivi qui se met à jour tout seul dans Google Sheets.
+**Automated finance-job radar (work-study and internships).** It aggregates offers, scores them against a personal profile, and delivers the best ones one at a time on Telegram, with a tracker that keeps itself up to date in Google Sheets.
 
-Projet personnel né d'un constat simple : dans une recherche d'alternance ou de stage en finance, la concurrence est rude et les bonnes offres partent vite. Rafraîchir dix plateformes à la main plusieurs fois par jour n'est pas tenable. Alternance Hunter fait ce travail à ma place, avec précision, et ne me sollicite que pour les offres qui valent vraiment le coup.
+A personal project born from a simple observation: in a finance work-study or internship search, competition is fierce and good offers go fast. Refreshing ten job boards by hand several times a day is not sustainable. Career Hunter does that work for me, precisely, and only pings me for offers that are actually worth it.
 
 ---
 
-## Ce qu'il fait
+## What it does
 
-- **Agrège plusieurs sources** : l'API officielle de l'alternance (La Bonne Alternance, service de l'État / France Travail) et des sources d'emploi publiques complémentaires, via une interface de source extensible. Objectif : maximiser la couverture pour ne rien louper.
-- **Score chaque offre sur 10** selon un profil paramétrable : mots-clés métier (M&A, Private Equity, Corporate Finance...), employeurs cibles (banques d'affaires, boutiques, fonds), niveau de diplôme, et exclusions dures (ex : écarter le juridique même si l'intitulé mentionne "M&A").
-- **Filtre par rentrée visée** : ne garde que les offres d'une campagne précise (ex : rentrée septembre 2027), en lisant la date de début ou l'année annoncée dans l'intitulé.
-- **Filtre le type de contrat, strictement** : alternance d'un côté, stage de l'autre, jamais de mélange (un poste "graduate" ou un CDI est écarté du flux alternance).
-- **Livre sur Telegram, une offre à la fois** : pas de mur de notifications. Le bot propose une carte, on tranche (Retenir / Passer / Pause), la suivante arrive. Impossible d'être noyé ou de sauter une offre.
-- **Tient un Google Sheet vivant** : les offres retenues, candidatées et leur statut se synchronisent en direct, avec mise en forme conditionnelle par résultat. Une seule source de vérité, jamais quarante versions du même fichier.
-- **Tourne en autonomie** : planifié plusieurs fois par jour sur la machine, il ne réveille l'utilisateur que quand une offre pertinente sort.
+- **Aggregates several sources**: the official work-study API (La Bonne Alternance, a French public service backed by France Travail) plus additional public job sources, through an extensible source interface. The goal is maximum coverage so nothing slips through.
+- **Scores every offer out of 10** against a configurable profile: role keywords (M&A, Private Equity, Corporate Finance...), target employers (investment banks, boutiques, funds), degree level, and hard exclusions (e.g. drop legal roles even when the title mentions "M&A").
+- **Filters by target intake**: keeps only a specific campaign (e.g. September 2027), based on the start date or the year stated in the title.
+- **Strict contract-type filter**: work-study on one side, internships on the other, never mixed (a "graduate" or permanent role is dropped from the work-study feed).
+- **Delivers on Telegram, one offer at a time**: no wall of notifications. The bot shows a card, you decide (Keep / Skip / Pause), the next one comes. Impossible to be flooded or to miss an offer.
+- **Keeps a live Google Sheet**: kept offers, applications and their status sync in real time, with conditional formatting by outcome. A single source of truth.
+- **Runs autonomously**: scheduled several times a day, it only wakes me when a relevant offer shows up.
 
 ---
 
@@ -22,73 +22,73 @@ Projet personnel né d'un constat simple : dans une recherche d'alternance ou de
 
 ```mermaid
 flowchart LR
-    A[Sources d'offres] --> B[Normalisation]
-    B --> C[Filtre contrat + rentrée]
+    A[Job sources] --> B[Normalization]
+    B --> C[Contract + intake filters]
     C --> D[Scoring /10]
-    D --> E[(SQLite<br/>anti-doublon<br/>+ file d'attente)]
-    E --> F[Bot Telegram<br/>triage 1 par 1]
-    F --> G[(Google Sheet<br/>suivi live)]
-    H[Planificateur] --> A
+    D --> E[(SQLite<br/>dedup<br/>+ queue)]
+    E --> F[Telegram bot<br/>one-by-one triage]
+    F --> G[(Google Sheet<br/>live tracker)]
+    H[Scheduler] --> A
 ```
 
-Le principe clé : chaque offre est stockée en base **avant** d'être proposée. Même hors-ligne ou après un redémarrage, rien n'est perdu et rien n'est proposé deux fois.
+Key principle: every offer is stored **before** being proposed. Even offline or after a restart, nothing is lost and nothing is proposed twice.
 
 ---
 
-## Stack technique
+## Tech stack
 
-| Domaine | Outils |
+| Area | Tools |
 |---|---|
-| Langage | Python 3 |
-| Données | API REST officielle, SQLite, sources HTML publiques |
-| Livraison | Bot Telegram (API brute + long polling) |
-| Suivi | Google Sheets API (`gspread` + compte de service) |
-| Automatisation | `launchd` (planification macOS) |
-| Config | YAML centralisé, secrets isolés hors du dépôt |
+| Language | Python 3 |
+| Data | Official REST API, SQLite, public sources |
+| Delivery | Telegram bot (raw API + long polling) |
+| Tracking | Google Sheets API (`gspread` + service account) |
+| Automation | `launchd` (macOS scheduling) |
+| Config | Centralized YAML, secrets kept out of the repo |
 
 ---
 
-## Points techniques mis en avant
+## Technical highlights
 
-- **Moteur de scoring maison** : pondération intitulé vs description, bonus employeurs cibles, exclusions simples et dures, tolérant aux accents et à la casse.
-- **Interface de source extensible** : ajouter une source = déposer un module exposant une fonction `fetch()` et l'activer dans la config. Le reste du pipeline ne change pas.
-- **Robustesse** : anti-doublon par URL, file d'attente persistante, dégradation propre si une source tombe (le scan continue sur les autres).
-- **UX pensée** : file une-par-une, pause/reprise, dernier clic humain conservé, suivi coloré automatique.
-- **Autonomie** : de la collecte à la notification, sans intervention.
+- **Custom scoring engine**: title-vs-description weighting, target-employer bonus, soft and hard exclusions, accent- and case-insensitive.
+- **Extensible source interface**: adding a source means dropping a module that exposes a `fetch()` function and enabling it in the config. The rest of the pipeline is untouched.
+- **Robustness**: URL and cross-source deduplication, persistent queue, WAL + busy-timeout for safe concurrent access, graceful degradation if a source fails (the scan continues on the others), atomic file writes.
+- **Thoughtful UX**: one-by-one queue, pause/resume, the final click stays human, automatic color-coded tracking.
+- **Autonomy**: from collection to notification, no manual step.
 
 ---
 
-## Installation
+## Setup
 
 ```bash
 git clone https://github.com/gab-spie/career-hunter.git
 cd career-hunter
 python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-cp config.example.yaml config.yaml   # puis adaptez vos critères
+cp config.example.yaml config.yaml   # then adjust your criteria
 ```
 
-Les identifiants (jeton d'API, bot Telegram, compte de service Google) se placent dans un dossier `secrets/` volontairement exclu du dépôt. Voir [`docs/ABOUT.md`](docs/ABOUT.md) pour le détail.
+Credentials (API token, Telegram bot, Google service account) live in a `secrets/` folder deliberately excluded from the repo. See [`docs/ABOUT.md`](docs/ABOUT.md) for details.
 
 ```bash
-python3 scan.py alternance        # un scan
-python3 telegram_bot.py alternance  # le bot de triage
+python3 scan.py alternance          # one scan
+python3 telegram_bot.py alternance  # the triage bot
 ```
 
 ---
 
 ## Documentation
 
-- [`docs/ABOUT.md`](docs/ABOUT.md) : ce que fait le projet, en détail.
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) : le flux, module par module.
-- [`docs/SKILLS.md`](docs/SKILLS.md) : les compétences mobilisées.
+- [`docs/ABOUT.md`](docs/ABOUT.md): what the project does, in detail.
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): the flow, module by module.
+- [`docs/SKILLS.md`](docs/SKILLS.md): the skills involved.
 
 ---
 
-## Statut
+## Status
 
-Opérationnel sur le volet alternance (collecte, scoring, Telegram, Google Sheets, planification). Volet stage et sources internationales en cours.
+Operational on the work-study side (collection, scoring, Telegram, Google Sheets, scheduling). Internship side and international sources in progress.
 
-## Licence
+## License
 
-MIT. Projet personnel, à but non commercial.
+MIT. Personal, non-commercial project.

@@ -1,44 +1,44 @@
 # Architecture
 
-## Vue d'ensemble
+## Overview
 
 ```
-Sources ─▶ Normalisation ─▶ Filtres (contrat, rentrée) ─▶ Scoring ─▶ SQLite
+Sources ─▶ Normalization ─▶ Filters (contract, intake) ─▶ Scoring ─▶ SQLite
                                                                         │
-                                       Google Sheet ◀── Bot Telegram ◀──┘
+                                        Google Sheet ◀── Telegram bot ◀─┘
 ```
 
 ## Modules
 
-| Fichier | Rôle |
+| File | Role |
 |---|---|
-| `config.yaml` | Tous les critères (mots-clés, employeurs, profils, filtres). Aucune ligne de code à toucher. |
-| `src/source_lba.py` | Source : API officielle de l'alternance. Interroge par géolocalisation, normalise les offres. |
-| `src/appconfig.py` | Chargement de la config et lecture des secrets. |
-| `src/scoring.py` | Note une offre sur 10 : mots-clés forts/moyens, employeurs cibles, diplôme, exclusions simples et dures. |
-| `src/contrat.py` | Filtre strict du type de contrat (alternance vs stage). |
-| `src/datematch.py` | Filtre de rentrée visée (date de début ou année dans l'intitulé). |
-| `src/db.py` | Base SQLite : anti-doublon par URL, file d'attente, états d'une offre, migrations. |
-| `scan.py` | Orchestration d'un passage : collecte, filtres, scoring, mise en file. |
-| `telegram_bot.py` | Bot de triage : digest, cartes une par une, boutons, statuts. |
-| `src/sheet.py` | Google Sheets : onglets, mise en forme conditionnelle, préservation des saisies manuelles. |
-| `src/sink.py` | Miroir CSV local des offres retenues. |
-| `run_once.py` | Un scan + notification, pour la planification. |
-| `notify.py` | Envoi du digest Telegram. |
+| `config.yaml` | All criteria (keywords, employers, profiles, filters). No code to touch. |
+| `src/source_lba.py` | Source: the official work-study API. Queries by geolocation, normalizes offers. |
+| `src/appconfig.py` | Loads the config and reads secrets. |
+| `src/scoring.py` | Scores an offer out of 10: strong/medium keywords, target employers, degree, soft and hard exclusions. |
+| `src/contrat.py` | Strict contract-type filter (work-study vs internship). |
+| `src/datematch.py` | Target-intake filter (start date or year in the title). |
+| `src/db.py` | SQLite: URL and cross-source dedup, queue, offer states, migrations, WAL. |
+| `scan.py` | Orchestrates one pass: collection, filters, scoring, queueing. |
+| `telegram_bot.py` | Triage bot: digest, one-by-one cards, buttons, statuses. |
+| `src/sheet.py` | Google Sheets: tabs, conditional formatting, preserves manual edits. |
+| `src/sink.py` | Local CSV mirror of kept offers. |
+| `run_once.py` + `notify.py` | One scan + digest, for scheduling. |
+| launchd plists | macOS scheduling (bot 24/7 + scan several times a day). |
 
-## États d'une offre
+## Offer states
 
 ```
 pending  ─▶ proposed ─▶ kept ─▶ applied
                      └▶ passed
 ```
 
-- `pending` : trouvée, pas encore proposée.
-- `proposed` : carte envoyée, en attente d'un choix.
-- `kept` : retenue (écrite dans le suivi).
-- `applied` : candidature marquée (avec date).
-- `passed` : écartée, jamais reproposée.
+- `pending`: found, not yet proposed.
+- `proposed`: card sent, awaiting a decision.
+- `kept`: retained (written to the tracker).
+- `applied`: application marked (with a date).
+- `passed`: dropped, never proposed again.
 
-## Extensibilité
+## Extensibility
 
-Une source est un module exposant `fetch(profil, config) -> list[dict]`, chaque offre au format normalisé (`url`, `entreprise`, `titre`, `lieu`, `contrat`, `date_debut`, ...). On l'active via `sources_extra` dans la config. Le pipeline en aval est identique pour toutes les sources.
+A source is a module exposing `fetch(profile, config) -> list[dict]`, each offer in the normalized format (`url`, `company`, `title`, `location`, `contract`, `start_date`, ...). It is enabled via `sources_extra` in the config. The downstream pipeline is identical for every source.

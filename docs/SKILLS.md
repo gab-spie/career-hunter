@@ -1,33 +1,33 @@
-# Compétences mobilisées
+# Skills involved
 
-Ce projet couvre une chaîne complète, de la donnée brute à un outil utilisable au quotidien.
+This project spans a full chain, from raw data to a tool used day to day.
 
-## Ingénierie logicielle
+## Software engineering
 
-- Architecture modulaire : sources, filtres, scoring, stockage, livraison et suivi sont découplés.
-- Interface de source extensible (ajout d'une source sans toucher au pipeline).
-- Base SQLite avec anti-doublon, file d'attente persistante et migrations douces de schéma.
-- Gestion propre des secrets, isolés hors du dépôt.
+- Modular architecture: sources, filters, scoring, storage, delivery and tracking are decoupled.
+- Extensible source interface (adding a source without touching the pipeline).
+- SQLite database with URL and cross-source deduplication, a persistent queue, and soft schema migrations.
+- Clean secret handling, kept out of the repo.
 
-## Intégration d'API et de données
+## API and data integration
 
-- Consommation d'une API REST officielle (authentification par jeton, requêtes géolocalisées, pagination).
-- Normalisation de données hétérogènes vers un modèle commun.
-- Google Sheets API via compte de service (écriture, mise en forme conditionnelle, préservation des saisies manuelles).
+- Consuming an official REST API (token auth, geolocated queries, pagination).
+- Normalizing heterogeneous data into a common model.
+- Google Sheets API via a service account (writing, conditional formatting, preserving manual edits).
 
-## Automatisation et outils
+## Automation and tooling
 
-- Bot Telegram interactif (long polling, claviers en ligne, machine à états de triage).
-- Planification système avec `launchd` (exécutions récurrentes, service maintenu en vie).
-- Notifications déclenchées par l'état des données.
+- Interactive Telegram bot (long polling, inline keyboards, a triage state machine).
+- System scheduling with `launchd` (recurring runs, a kept-alive service).
+- Notifications driven by the state of the data.
 
-## Logique métier finance
+## Finance domain logic
 
-- Modèle de scoring pensé pour un profil finance : M&A, Private Equity, Corporate Finance, banques d'affaires, boutiques, fonds.
-- Distinction fine des types de contrat et des campagnes de recrutement.
+- A scoring model designed for a finance profile: M&A, Private Equity, Corporate Finance, investment banks, boutiques, funds.
+- Fine-grained handling of contract types and recruitment campaigns.
 
-## Méthode
+## Method
 
-- Décisions guidées par la donnée réelle (mesure de la couverture d'une source avant de l'intégrer).
-- Choix assumés de précision : préférer le silence au bruit.
-- Usage d'outils d'IA pour concevoir, itérer et fiabiliser rapidement.
+- Decisions driven by real data (measuring a source's coverage before integrating it).
+- Deliberate precision trade-offs: prefer silence over noise.
+- Using AI tools to design, iterate and harden quickly.
