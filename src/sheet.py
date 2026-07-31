@@ -17,7 +17,9 @@ import appconfig
 import db
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets",
-          "https://www.googleapis.com/auth/drive"]
+          "https://www.googleapis.com/auth/drive.file"]
+
+GSPREAD_TIMEOUT = 30  # seconds: a Google stall must not freeze the bot
 
 HEADERS = ["Added", "Company", "Title", "Location", "Start date", "Score",
            "Link", "Source", "Status", "Applied on", "Outcome", "Notes"]
@@ -36,6 +38,7 @@ def client(cfg):
     creds = Credentials.from_service_account_file(
         str(appconfig.ROOT / gs["credentials_file"]), scopes=SCOPES)
     gc = gspread.authorize(creds)
+    gc.set_timeout(GSPREAD_TIMEOUT)  # a Google stall must not freeze the bot
     return gc.open_by_key(gs["spreadsheet_id"])
 
 
@@ -139,7 +142,7 @@ def sync_values(sh, conn, cfg, profil):
     manual, keyless = _read_manual(ws)
     data = [HEADERS] + _rows_from_db(conn, profil, manual, keyless, no_reply_days)
     ws.clear()
-    ws.update(values=data, range_name="A1")
+    ws.update(values=data, range_name="A1", value_input_option="RAW")
     ws.format("A1:L1", {"textFormat": {"bold": True,
               "foregroundColor": {"red": 1, "green": 1, "blue": 1}},
               "backgroundColor": {"red": 0.12, "green": 0.16, "blue": 0.27},
@@ -209,7 +212,7 @@ def import_archive(sh, cfg, xlsx_path: Path):
     ws.clear()
     if not values:
         return ws, 0
-    ws.update(values=values, range_name="A1")
+    ws.update(values=values, range_name="A1", value_input_option="RAW")
     ws.format(f"A1:{chr(64 + ncols)}1", {"textFormat": {"bold": True}})
     ws.freeze(rows=1)
 

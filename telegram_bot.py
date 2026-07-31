@@ -26,7 +26,7 @@ import db  # noqa: E402
 import sink  # noqa: E402
 import sheet  # noqa: E402
 
-PROFIL = sys.argv[1] if len(sys.argv) > 1 else "alternance"
+PROFIL = appconfig.validate_profil(sys.argv[1] if len(sys.argv) > 1 else "alternance")
 TOKEN = appconfig.read_secret(f"secrets/telegram_{PROFIL}_token.txt")
 CHAT_ID = appconfig.read_secret("secrets/telegram_chat_id.txt")
 API = f"https://api.telegram.org/bot{TOKEN}"
@@ -40,7 +40,7 @@ def api(method: str, **params):
         r = requests.post(f"{API}/{method}", json=params, timeout=40)
         return r.json()
     except Exception as e:  # noqa: BLE001
-        print(f"  api {method} failed: {e}")
+        print(f"  api {method} failed: {type(e).__name__}: {appconfig.scrub(str(e))}")
         return {}
 
 
@@ -145,9 +145,12 @@ def on_applied(conn, oid, chat_id, mid):
 
 def handle_callback(conn, cq):
     global paused
-    data = cq.get("data", "")
     msg = cq.get("message", {})
     chat_id = msg.get("chat", {}).get("id")
+    from_id = cq.get("from", {}).get("id")
+    if str(chat_id) != str(CHAT_ID) or str(from_id) != str(CHAT_ID):
+        return  # not the owner: ignore silently
+    data = cq.get("data", "")
     mid = msg.get("message_id")
     api("answerCallbackQuery", callback_query_id=cq["id"])
 
@@ -167,6 +170,8 @@ def handle_callback(conn, cq):
 
 def handle_message(conn, msg):
     global paused
+    if str(msg.get("chat", {}).get("id")) != str(CHAT_ID):
+        return  # not the owner: ignore silently
     text = (msg.get("text") or "").strip().lower()
     if text in ("/go", "/resume", "/start"):
         paused = False
@@ -183,7 +188,7 @@ def main():
         api("deleteWebhook")
         send_digest(conn)
     except Exception as e:  # noqa: BLE001
-        print("startup error:", e)
+        print(f"startup error: {type(e).__name__}: {appconfig.scrub(str(e))}")
     offset = None
     while True:
         try:
@@ -200,9 +205,9 @@ def main():
                     elif "message" in u:
                         handle_message(conn, u["message"])
                 except Exception as e:  # noqa: BLE001
-                    print("update error:", e)
+                    print(f"update error: {type(e).__name__}: {appconfig.scrub(str(e))}")
         except Exception as e:  # noqa: BLE001
-            print("loop error:", e)
+            print(f"loop error: {type(e).__name__}: {appconfig.scrub(str(e))}")
             time.sleep(3)
 
 
