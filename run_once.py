@@ -26,6 +26,13 @@ def main():
         print(f"scan failed: {type(e).__name__}: {appconfig.scrub(str(e))}")
         return
     print(f"{profil}: {new} new, {pending} queued")
+    # full mirror in the "All offers" tab (best effort)
+    try:
+        import db
+        import sheet
+        sheet.sync_all_offers(sheet.client(appconfig.load_config()), db.connect())
+    except Exception as e:  # noqa: BLE001
+        print(f"All offers tab not updated: {type(e).__name__}: {appconfig.scrub(str(e))}")
     if new > 0:
         try:
             notify.send_digest(profil)

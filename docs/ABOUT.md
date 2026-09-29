@@ -9,7 +9,7 @@ It collects offers from several sources, normalizes them into a common format, d
 ## The filters
 
 1. **Contract type (strict).** The work-study feed keeps only work-study or apprenticeship offers. The internship feed keeps only internships. A "graduate" or permanent role is dropped from the work-study feed.
-2. **Target intake.** Only a specific campaign is kept (for example September 2027), from the start date when it is known, or the year read in the title otherwise.
+2. **Target period.** Only a specific campaign is kept (for example September 2027, or from March 2027 for an internship), from the start date when it is known, otherwise from dates read in the title or in the full offer text.
 3. **Relevance score.** Each offer gets a score out of 10: role keywords, target employers, degree level, soft and hard exclusions.
 
 Only offers that pass all three filters and clear a score threshold are proposed. Everything else stays silent, by design: zero noise.

@@ -17,7 +17,8 @@ Sources ─▶ Normalization ─▶ Filters (contract, intake) ─▶ Scoring �
 | `src/appconfig.py` | Loads the config and reads secrets. |
 | `src/scoring.py` | Scores an offer out of 10: strong/medium keywords, target employers, degree, soft and hard exclusions. |
 | `src/contrat.py` | Strict contract-type filter (work-study vs internship). |
-| `src/datematch.py` | Target-intake filter (start date or year in the title). |
+| `src/datematch.py` | Target-period filter: start date, "month year" or "H1 2027" in the title or full offer text, FR + EN. |
+| `src/stats.py` | Per-scan funnel log and daily summary for the evening debrief and `/status`. |
 | `src/db.py` | SQLite: URL and cross-source dedup, queue, offer states, migrations, WAL. |
 | `scan.py` | Orchestrates one pass: collection, filters, scoring, queueing. |
 | `telegram_bot.py` | Triage bot: digest, one-by-one cards, buttons, statuses. |

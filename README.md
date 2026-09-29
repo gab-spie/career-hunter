@@ -10,10 +10,11 @@ A personal project born from a simple observation: in a finance work-study or in
 
 - **Aggregates sources through an extensible interface**: ships with a connector for the official work-study API (La Bonne Alternance, a French public service backed by France Travail); additional public job sources can be plugged in without touching the pipeline. The goal is broad coverage so little slips through.
 - **Scores every offer out of 10** against a configurable profile: role keywords (M&A, Private Equity, Corporate Finance...), target employers (investment banks, boutiques, funds), degree level, and hard exclusions (e.g. drop legal roles even when the title mentions "M&A").
-- **Filters by target intake**: keeps only a specific campaign (e.g. September 2027), based on the start date or the year stated in the title.
+- **Filters by target period**: keeps only a specific campaign (September 2027 for work-study, from March 2027 for an internship). The start date is read from the source, the title, or the full offer text ("from January or March 2027", "H1 2027"), in French and English. An offer whose text cannot be read is kept and flagged "start date to check" rather than silently lost.
 - **Strict contract-type filter**: work-study on one side, internships on the other, never mixed (a "graduate" or permanent role is dropped from the work-study feed).
 - **Delivers on Telegram, one offer at a time**: no wall of notifications. The bot shows a card, you decide (Keep / Skip / Pause), the next one comes. Impossible to be flooded or to miss an offer.
-- **Keeps a live Google Sheet**: kept offers, applications and their status sync in real time, with conditional formatting by outcome. A single source of truth.
+- **Keeps a live Google Sheet**: kept offers, applications and their status sync in real time, with conditional formatting by outcome. A status typed by hand ("Applied") is written back to the database instead of being overwritten. An "All offers" tab mirrors every offer seen, and a "Recruiters" tab tracks contacts with status dropdowns.
+- **Reports on its own health**: a green ping when a bot starts, a red one when it stops, `/status` on demand, a `/` command menu, and an evening debrief (offers analysed, dropped, kept). No debrief means the bot is down.
 - **Runs autonomously**: scheduled several times a day, it only wakes me when a relevant offer shows up.
 
 ---
@@ -53,7 +54,8 @@ Key principle: every offer is stored **before** being proposed. Even offline or 
 - **Custom scoring engine**: title-vs-description weighting, target-employer bonus, soft and hard exclusions, accent- and case-insensitive.
 - **Extensible source interface**: a source is any module exposing `fetch(profile, config)` and returning normalized offers. The contract lives in [`sources/base.py`](sources/base.py), with a ready-to-copy template in [`sources/example_source.py`](sources/example_source.py). The rest of the pipeline is untouched.
 - **Robustness**: URL and cross-source deduplication, persistent queue, WAL + busy-timeout for safe concurrent access, graceful degradation if a source fails (the scan continues on the others), atomic file writes.
-- **Tested**: unit tests on the real logic (scoring, contract and intake filters, deduplication) with `pytest`.
+- **Tested**: unit tests on the real logic (scoring, contract and date filters, deduplication, daily stats) with `pytest`.
+- **Resilient delivery**: every Telegram call retries on a network blip, so a card or an Apply link is never lost while the database moves on.
 - **Thoughtful UX**: one-by-one queue, pause/resume, the final click stays human, automatic color-coded tracking.
 - **Autonomy**: from collection to notification, no manual step.
 
@@ -89,9 +91,9 @@ pytest                              # run the test suite
 
 ## Status
 
-Operational on the work-study side (collection, scoring, Telegram, Google Sheets, scheduling). Internship side and international sources in progress.
+Operational on both sides: work-study and internship bots run side by side, each with its own schedule, target period and Google Sheet tab.
 
-> **A note on language.** Documentation, configuration, comments and messages are in English. A few identifiers stay in the author's French, tied to the French domain and data model: the offer/DB field names (`titre`, `entreprise`, `lieu`, `contrat`, `date_debut`...) and the `profil` argument; the profile ids `alternance` / `stage` (the French work-study and internship contracts, also used as the CLI argument); the official source id `labonnealternance`; and a short list of French month names used to match French-language job titles.
+> **A note on language.** Documentation, configuration, comments and messages are in English. A few identifiers stay in the author's French, tied to the French domain and data model: the offer/DB field names (`titre`, `entreprise`, `lieu`, `contrat`, `date_debut`...) and the `profil` argument; the profile ids `alternance` / `stage` (the French work-study and internship contracts, also used as the CLI argument); the official source id `labonnealternance`; and the French month names used, next to the English ones, to read start dates in French-language offers.
 
 ## License
 

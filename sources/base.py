@@ -24,6 +24,14 @@ Normalized offer (a plain dict):
 
 Field names keep the author's French naming (see the README language note).
 
+Optional hook: a source may also expose ``describe(offer)`` returning
+``(text, readable, clean)`` with the full text of one offer. The pipeline
+calls it only for NEW offers when ``read_full_offers`` is on for the profile,
+so the start date ("from March 2027") is found even when the title is silent.
+``clean`` is True when the text is the offer alone (then it also feeds the
+score); a whole web page (menus included) is used for the date only.
+``readable`` False flags the offer "start date to check" instead of dropping it.
+
 To add a source: create a module with a ``fetch`` function matching
 ``Source`` below, then enable it in ``config.yaml`` under ``extra_sources``.
 See ``sources/example_source.py`` for a template. Concrete connectors (such as

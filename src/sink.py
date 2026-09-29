@@ -25,7 +25,7 @@ _FORMULA_LEAD_CHARS = ("=", "+", "-", "@", "\t", "\r")
 
 def _csv_safe(value):
     """Prefix a string cell that would be read as a formula (Excel/Sheets CSV
-    import) with a single quote, so scraped titles/URLs stay inert text."""
+    import) with a single quote, so collected titles/URLs stay inert text."""
     if isinstance(value, str) and value.startswith(_FORMULA_LEAD_CHARS):
         return "'" + value
     return value

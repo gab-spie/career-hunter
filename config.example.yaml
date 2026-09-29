@@ -62,6 +62,26 @@ profiles:
       months: [8, 9, 10, 11]
       strict: true
 
+  stage:
+    tab: "Internship"
+    type: "internship"
+    contracts: ["internship"]
+    locations:
+      - name: "Paris / Ile-de-France"
+        latitude: 48.8566
+        longitude: 2.3522
+        radius_km: 30
+    min_score: 3.0            # any finance offer, not only the core target
+    intake:                   # internships starting from March 2027
+      year: 2027
+      months: [3, 4, 5]
+      strict: true            # no readable date -> dropped
+    # For NEW offers, ask the source for the full offer text (describe() hook,
+    # see sources/base.py) to find the start date when the title is silent.
+    # An unreadable offer is kept and flagged "start date to check".
+    read_full_offers: true
+    read_pause_seconds: 2
+
 # Target degree level (European scale: 5=Bac+2, 6=Bac+3, 7=Master)
 degree:
   target_eu: 7

@@ -37,3 +37,10 @@ class ExampleSource:
 def fetch(profile: str, config: dict) -> list[dict]:
     """Module-level entry point used by the pipeline (config `extra_sources`)."""
     return ExampleSource.fetch(profile, config)
+
+
+def describe(offer: dict) -> tuple[str, bool, bool]:
+    """Optional hook: full text of one offer -> (text, readable, clean).
+    Here the text is already in the offer, so it is returned as is."""
+    text = offer.get("description") or ""
+    return text, bool(text), True

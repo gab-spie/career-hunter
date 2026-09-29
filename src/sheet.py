@@ -4,10 +4,13 @@ Google Sheet integration.
 - profile tabs fed by the bots
 - an archive tab (import of a spreadsheet WITH its colors)
 - Outcome column = dropdown, automatic row coloring
-- manual edits (Outcome, Notes) are preserved on every sync
+- manual edits (Status "Applied", Applied on, Outcome, Notes) are preserved
+  on every sync; an "Applied" typed by hand is written back to the DB
+- an "All offers" tab mirrors the whole DB, a "Recruiters" tab tracks contacts
 - auto "No reply (3+ weeks)" a configurable number of days after applying
 """
 
+import unicodedata
 from datetime import date
 from pathlib import Path
 import gspread
@@ -25,6 +28,8 @@ HEADERS = ["Added", "Company", "Title", "Location", "Start date", "Score",
            "Link", "Source", "Status", "Applied on", "Outcome", "Notes"]
 NCOLS = len(HEADERS)
 COL_LINK = 6        # 0-based index of "Link"
+COL_STATUS = 8      # 0-based index of "Status"
+COL_APPLIED_ON = 9  # 0-based index of "Applied on"
 COL_OUTCOME = 10    # 0-based index of "Outcome" (column K)
 
 STATUS = {"kept": "To apply", "applied": "Applied"}
@@ -72,10 +77,30 @@ def _outcome_notes(row):
     return res, notes
 
 
+def _typed_applied(row) -> bool:
+    """True if an existing row says "Applied" (typed by hand in the Sheet)."""
+    s = row[COL_STATUS] if len(row) > COL_STATUS else ""
+    s = unicodedata.normalize("NFD", s or "")
+    s = "".join(c for c in s if unicodedata.category(c) != "Mn").lower().strip()
+    return ("applied" in s or "postul" in s) and "to apply" not in s and "a postuler" not in s
+
+
+def _write_back_manual(conn, profil, manual):
+    """The Sheet wins for Status / Applied on: an "Applied" typed by hand goes
+    back to the DB, otherwise the next sync would reset it to "To apply"."""
+    for r in db.list_for_sheet(conn, profil):
+        row = manual.get(r["url"])
+        if not row or r["queue_status"] == "applied" or not _typed_applied(row):
+            continue
+        when = (row[COL_APPLIED_ON] if len(row) > COL_APPLIED_ON else "").strip()
+        db.set_applied(conn, r["id"], when or date.today().isoformat())
+
+
 def _rows_from_db(conn, profil, manual, keyless, no_reply_days):
     today = date.today()
     out = []
     db_urls = set()
+    _write_back_manual(conn, profil, manual)
     for r in db.list_for_sheet(conn, profil):
         url = r["url"]
         db_urls.add(url)
@@ -173,7 +198,12 @@ def quick_push(profil):
     cfg = appconfig.load_config()
     conn = db.connect()
     sh = client(cfg)
-    return sync_values(sh, conn, cfg, profil)
+    ws = sync_values(sh, conn, cfg, profil)
+    try:
+        sync_all_offers(sh, conn)
+    except Exception as e:  # noqa: BLE001
+        print("  (All offers tab not updated:", e, ")")
+    return ws
 
 
 # --------------------------------------------------------------------------
@@ -230,3 +260,102 @@ def import_archive(sh, cfg, xlsx_path: Path):
     for k in range(0, len(reqs), 200):
         sh.batch_update({"requests": reqs[k:k + 200]})
     return ws, len(values) - 1
+
+
+# --------------------------------------------------------------------------
+# "All offers" tab: full mirror of the DB (both profiles, every status).
+# Read-only: rewritten on every sync. Manual edits belong in the profile tabs.
+# --------------------------------------------------------------------------
+TAB_ALL = "All offers"
+HEADERS_ALL = ["Added", "Profile", "Company", "Title", "Location",
+               "Start date", "Score", "Status", "Source", "Link"]
+STATUS_ALL = {
+    "pending": "Queued (not seen yet)", "proposed": "Proposed",
+    "kept": "Kept", "applied": "Applied", "passed": "Skipped",
+}
+_HEADER_FORMAT = {"textFormat": {"bold": True,
+                  "foregroundColor": {"red": 1, "green": 1, "blue": 1}},
+                  "backgroundColor": {"red": 0.12, "green": 0.16, "blue": 0.27},
+                  "horizontalAlignment": "CENTER"}
+
+
+def sync_all_offers(sh, conn):
+    rows = conn.execute("SELECT * FROM offers ORDER BY found_at DESC").fetchall()
+    data = [HEADERS_ALL] + [[
+        (r["found_at"] or "")[:10], r["profil"], r["entreprise"] or "", r["titre"],
+        r["lieu"] or "", r["date_debut"] or "", r["score"],
+        STATUS_ALL.get(r["queue_status"], r["queue_status"]),
+        r["source"] or "", r["url"],
+    ] for r in rows]
+    ws = ensure_ws(sh, TAB_ALL, rows=len(data) + 20, cols=len(HEADERS_ALL))
+    if ws.row_count < len(data) + 5:
+        ws.resize(rows=len(data) + 50)
+    ws.clear()
+    ws.update(values=data, range_name="A1", value_input_option="RAW")
+    ws.format("A1:J1", _HEADER_FORMAT)
+    ws.freeze(rows=1)
+    try:
+        ws.set_basic_filter(f"A1:J{len(data)}")
+    except Exception:  # noqa: BLE001
+        pass
+    return ws
+
+
+# --------------------------------------------------------------------------
+# "Recruiters" tab: filled by hand. Created once, never rewritten.
+# --------------------------------------------------------------------------
+TAB_RECRUITERS = "Recruiters"
+HEADERS_RECRUITERS = ["Name", "Company", "Role", "Focus", "City",
+                      "LinkedIn profile", "Email", "Mutual connection",
+                      "For", "Contact status", "Contacted on", "Follow-up", "Notes"]
+CONTACT_STATUS = ["To contact", "Request sent", "Connected", "Message sent",
+                  "Replied", "Interview", "No reply", "Not relevant"]
+FOR_OPTIONS = ["Internship", "Work-study", "Both"]
+
+
+def _dropdown(ws, col, options):
+    return {"setDataValidation": {
+        "range": {"sheetId": ws.id, "startRowIndex": 1,
+                  "startColumnIndex": col, "endColumnIndex": col + 1},
+        "rule": {"condition": {"type": "ONE_OF_LIST",
+                               "values": [{"userEnteredValue": v} for v in options]},
+                 "showCustomUi": True, "strict": False}}}
+
+
+def ensure_recruiters(sh):
+    """Create the tab if missing. Never touches existing rows."""
+    try:
+        return sh.worksheet(TAB_RECRUITERS), False
+    except gspread.WorksheetNotFound:
+        pass
+    ws = sh.add_worksheet(title=TAB_RECRUITERS, rows=200, cols=len(HEADERS_RECRUITERS))
+    ws.update(values=[HEADERS_RECRUITERS], range_name="A1", value_input_option="RAW")
+    ws.format("A1:M1", _HEADER_FORMAT)
+    ws.freeze(rows=1)
+    col_status = HEADERS_RECRUITERS.index("Contact status")
+    letter = chr(65 + col_status)
+    locale = str(sh.fetch_sheet_metadata().get("properties", {}).get("locale", "en_US"))
+    sep = ";" if locale.lower().startswith("fr") else ","
+    rng = {"sheetId": ws.id, "startRowIndex": 1, "startColumnIndex": 0,
+           "endColumnIndex": len(HEADERS_RECRUITERS)}
+
+    def color(regex, r, g, b):
+        return {"addConditionalFormatRule": {"index": 0, "rule": {
+            "ranges": [rng], "booleanRule": {
+                "condition": {"type": "CUSTOM_FORMULA", "values": [
+                    {"userEnteredValue": f'=REGEXMATCH(${letter}2{sep}"{regex}")'}]},
+                "format": {"backgroundColor": {"red": r, "green": g, "blue": b}}}}}}
+    sh.batch_update({"requests": [
+        _dropdown(ws, col_status, CONTACT_STATUS),
+        _dropdown(ws, HEADERS_RECRUITERS.index("For"), FOR_OPTIONS),
+        color("(?i)replied|interview", 0.85, 0.92, 0.83),     # green = alive
+        color("(?i)no reply|not relevant", 0.96, 0.80, 0.80),  # red = dead end
+    ]})
+    return ws, True
+
+
+def add_recruiter(sh, card: dict):
+    """Append one recruiter row (dict keyed by HEADERS_RECRUITERS)."""
+    ws, _ = ensure_recruiters(sh)
+    ws.append_row([card.get(h, "") for h in HEADERS_RECRUITERS],
+                  value_input_option="RAW")
